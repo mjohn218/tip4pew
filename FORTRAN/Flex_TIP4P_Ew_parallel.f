@@ -1,0 +1,4326 @@
+      PROGRAM EWALD
+C
+C     This is a molecular dynamics program in the NPT ensemble. 
+C     The simulation box contains flexible solute molecules (here 
+C     small peptides) and rigid water molecules (here TIP4P-Ew) as 
+C     solvents. The velocity Verlet algorithm is used to propogate 
+C     the equations of motion. Nose-Hoover-Andersen scheme is used 
+C     to controll the temperature and pressure. There are two 
+C     Nose-Hoover thermostats -- one associated with the momentum 
+C     of the particles and the other with the momentum of the 
+C     volume variable. Intial velocities are assigned from the 
+C     standard Maxwell-Boltzmann distribution. A portable random 
+C     number generator from Numerical Recipes is used.
+C
+C     Rajesh Kumar Murarka, May 2005
+C
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,NBOND,IBOND,JBOND,NANGLE
+      INTEGER IANGLE,JANGLE,KANGLE,NDIHE,IDIHE,JDIHE,KDIHE,LDIHE
+      INTEGER NP,NIMP,IIMP,JIMP,KIMP,LIMP,NSOL,NATSOL,NATOMS,NBON14
+      INTEGER INBON14,JNBON14,NBON,INBON,JNBON,I,J,K,L,N,NSATOM
+      INTEGER NFLEX,IEQUIL,ISEED,IWRITE,JWRITE,KWRITE,NCONST
+      INTEGER NOMIT,ICHECK,JCHECK,KCHECK,ITER2,KMAX,ISAVE,NATFLEX
+      INTEGER ITER,NTOTAL,NEQ,ISSE,NK,ICHUNK,NC,NCHUNK,NATOMD
+      INTEGER MC,NTC,NYS
+      DOUBLE PRECISION X,Y,Z,XCF,YCF,ZCF,VX,VY,VZ,FX,FY,FZ
+      DOUBLE PRECISION POSF,POSCF,VELF,FF
+      DOUBLE PRECISION DT,DT2,TEMP,PINT,DENSITY,BOXL,BOXLI
+      DOUBLE PRECISION TOL,RLOWER,RUPPER,AS,BS,CS,ALPHA,A2,A22I
+      DOUBLE PRECISION VOLUME,AMOLW,FACT,FACT2,FACTOR
+      DOUBLE PRECISION EPOT,EKIN,ETOT,TEMPI,TEMPS
+      DOUBLE PRECISION ETAVE,ETAVE2,EPAVE,EPAVE2,EKAVE,TAVE,TAVE2
+      DOUBLE PRECISION PAVE,PAVE2,DNF,CONSTM,GNKT,GKT,CHI,AKIN,AKIN_SUM
+      DOUBLE PRECISION E0,ENINT,SUMX,SUMY,SUMZ,MSUM,DITER,SIGMA
+      DOUBLE PRECISION PI,PFACT,PCONST,RL2,RU2,ELRC,PLRC
+      DOUBLE PRECISION ELRCINT,PLRCINT,VK,VIRK,VIRTOT
+      DOUBLE PRECISION VXSUM,VYSUM,VZSUM,VMSUM,VCMX,VCMY,VCMZ,EKCM
+      DOUBLE PRECISION ETA,VETA,TAUP,TMAS,W,WDT2,WDT4,WDT8,GT
+      DOUBLE PRECISION THTE,THKE,THPE1,THPE2,THPEM,THKE0
+      DOUBLE PRECISION AMASS,FIXD,AMASSF,AMASSFI,DMASSI
+      DOUBLE PRECISION ASPC,CSPC,RSPC,RSPC2,ESPC,Q,QF,FCB,R0,FCA,A0
+      DOUBLE PRECISION FCD,D0,FCP,P0,RSOL,ESOL,RWSOL
+      DOUBLE PRECISION EWSOL,SCVDW14,SCELE14,BOLTZK
+      DOUBLE PRECISION RLOWS,RUPPS,RLS2,RUS2,ASS,BSS,CSS,EOMIT
+      DOUBLE PRECISION VECK,V,RINCR,RINCRI,ENERGY
+      DOUBLE PRECISION xx12,yy12,zz12,xv12,yv12,zv12,rvdot
+      PARAMETER (NATOM=432,NSATOM=456)
+      PARAMETER (NSITE=4)
+      PARAMETER (BOLTZK=0.83144703385D0,AMOLW=18.01528D0)
+      PARAMETER (PFACT=0.145839756E-04)
+
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION XCF(NATOM,3),YCF(NATOM,3),ZCF(NATOM,3)
+      DIMENSION VX(NATOM,3),VY(NATOM,3),VZ(NATOM,3)
+      DIMENSION FX(NATOM,NSITE),FY(NATOM,NSITE),FZ(NATOM,NSITE)
+      DIMENSION POSF(NSATOM,3),POSCF(NSATOM,3),VELF(NSATOM,3)
+      DIMENSION FF(NSATOM,3)
+      DIMENSION AMASS(NATOM,3),FIXD(3,3),AMASSF(NSATOM)
+      DIMENSION AMASSFI(NSATOM),DMASSI(3)
+      DIMENSION WDT2(5),WDT4(5),WDT8(5)
+      DIMENSION ETA(5),VETA(5),GT(5),TMAS(5)
+      DIMENSION ENERGY(15)
+      COMMON/WATER/ASPC,CSPC,RSPC,RSPC2,ESPC,Q(1000,4)
+      COMMON/SOLUT/QF(1000)
+      COMMON/KVEC/VECK(10000)
+      COMMON/VTABLE/V(4,500000),RINCR,RINCRI
+      COMMON/BOND/FCB(2000),R0(2000),NBOND,IBOND(2000),JBOND(2000)
+      COMMON/ANGLE/FCA(2000),A0(2000),NANGLE,IANGLE(2000),
+     $             JANGLE(2000),KANGLE(2000)
+      COMMON/DIHE/FCD(2000),D0(2000),NDIHE,IDIHE(2000),JDIHE(2000),
+     $            KDIHE(2000),LDIHE(2000),NP(2000)
+      COMMON/IMPR/FCP(2000),P0(2000),NIMP,IIMP(2000),JIMP(2000),
+     $            KIMP(2000),LIMP(2000)
+      COMMON/FLEXI/RSOL(2000),ESOL(2000),RWSOL(2000),EWSOL(2000),
+     $             SCVDW14,SCELE14,NBON14,INBON14(2000),
+     $             JNBON14(2000),NBON,INBON(5000),JNBON(5000)
+
+      INCLUDE 'mpif.h'
+      INTEGER IERR
+      INTEGER RANK,NPROCS
+      INTEGER NPERPR,NPERPF,NFP
+      INTEGER DOUBLE_QUAD,DOUBLE_THREE,DOUBLE_SOL
+      INTEGER WATER_LOCAL,DISP,PROCS,SOLUTE_LOCAL,SOL_DISP
+      INTEGER NPERPR_LOC,NPERPF_LOC,NFP_LOC
+      PARAMETER(PROCS=24)
+      PARAMETER(NPERPR=18,NPERPF=1,NFP=NPERPF*19)
+      DOUBLE PRECISION LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_POSF
+      DOUBLE PRECISION LOCAL_XCF,LOCAL_YCF,LOCAL_ZCF,LOCAL_POSCF
+      DOUBLE PRECISION LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF
+      DOUBLE PRECISION FF_SUM,ENERGY_T
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE),LOCAL_POSF(NFP,3)
+      DIMENSION LOCAL_XCF(NPERPR,3),LOCAL_YCF(NPERPR,3)
+      DIMENSION LOCAL_ZCF(NPERPR,3),LOCAL_POSCF(NFP,3)
+      DIMENSION LOCAL_VX(NPERPR,3),LOCAL_VY(NPERPR,3)
+      DIMENSION LOCAL_VZ(NPERPR,3),LOCAL_VELF(NFP,3)
+      DIMENSION FF_SUM(NSATOM,3),ENERGY_T(15)
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+      DIMENSION SOLUTE_LOCAL(PROCS),SOL_DISP(PROCS+1)
+      DOUBLE PRECISION SCATTERBUF,SCATTERLOCAL,SCATTERBUF_1
+      DOUBLE PRECISION SCATTERLOCAL_1,SCATTERBUF_2,SCATTERLOCAL_2
+      DIMENSION SCATTERBUF(NSITE,3,NATOM),SCATTERLOCAL(NSITE,3,NPERPR)
+      DIMENSION SCATTERBUF_1(3,3,NATOM),SCATTERLOCAL_1(3,3,NPERPR)
+      DIMENSION SCATTERBUF_2(3,NSATOM),SCATTERLOCAL_2(3,NFP)
+     
+
+      CALL MPI_INIT(IERR)
+
+      CALL MPI_COMM_RANK(MPI_COMM_WORLD,RANK,IERR)
+      CALL MPI_COMM_SIZE(MPI_COMM_WORLD,NPROCS,IERR)
+
+      OPEN(UNIT=5,FILE='gly3M_298.inp',STATUS='UNKNOWN')
+      OPEN(UNIT=64,FILE='vel3M_298.inp',STATUS='UNKNOWN')
+
+c      OPEN(UNIT=2,FILE='pos_O_chunk.dat',FORM='UNFORMATTED')
+c      OPEN(UNIT=3,FILE='pos_H_chunk.dat',FORM='UNFORMATTED')
+c      OPEN(UNIT=4,FILE='pos_SOL_chunk.dat',FORM='UNFORMATTED')
+
+      OPEN(UNIT=7,FILE='pos_O_40_1.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=8,FILE='pos_H_40_1.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=9,FILE='pos_SOL_40_1.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=10,FILE='pos_O_40_2.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=11,FILE='pos_H_40_2.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=12,FILE='pos_SOL_40_2.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=13,FILE='pos_O_40_3.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=14,FILE='pos_H_40_3.dat',FORM='UNFORMATTED')
+      OPEN(UNIT=15,FILE='pos_SOL_40_3.dat',FORM='UNFORMATTED')
+
+      OPEN(UNIT=40,FILE='inst_prop_1.dat',STATUS='UNKNOWN')
+      OPEN(UNIT=47,FILE='av_prop_1.dat',STATUS='UNKNOWN')
+      
+C     Read in the data on simulation parameters
+C
+      CALL SIMPARM(DT,TEMP,DENSITY,BOXL,BOXLI,TOL,RLOWER,
+     $             RUPPER,RL2,RU2,AS,BS,CS,RLOWS,RUPPS,RLS2,
+     $             RUS2,ASS,BSS,CSS,EOMIT,ETA,VETA,TAUP,MC,NTC,
+     $             NYS,NRIGID,NFLEX,NATFLEX,IEQUIL,ISEED,NTOTAL,
+     $             NEQ,IWRITE,JWRITE,KWRITE,NCONST,NATOMD,NOMIT,
+     $             NC,NCHUNK)
+C
+C     Read in the data on molecular parameters; rigid molecules
+C
+      CALL RIGIDMOL(X,Y,Z,XCF,YCF,ZCF,VX,VY,VZ,AMASS,FIXD,BOXL,
+     $              BOXLI,DMASSI,NATOM,NSITE,NRIGID,NPRIM,
+     $              NATOMD,IEQUIL)
+
+      CALL SPLIT_WATER(NRIGID,WATER_LOCAL,DISP,PROCS,NPERPR_LOC,RANK)
+
+      CALL SPLIT_SOLUTE(NFLEX,SOLUTE_LOCAL,SOL_DISP,PROCS,NPERPF_LOC,
+     $                  NATFLEX,NFP_LOC,RANK)
+C
+C     Read in the data on molecular parameters; flexible molecules
+C
+      CALL FLEXIMOL(X,Y,Z,VX,VY,VZ,POSF,POSCF,VELF,AMASS,AMASSF,
+     $              AMASSFI,BOXL,BOXLI,NATOM,NSITE,NSOL,NATSOL,
+     $              IEQUIL,NATOMS,NRIGID,NPRIM,NFLEX,NSATOM,NPERPF,
+     $              NPERPF_LOC)
+   
+      CALL MPI_TYPE_CONTIGUOUS(12,MPI_DOUBLE_PRECISION,DOUBLE_QUAD,IERR)
+      CALL MPI_TYPE_COMMIT(DOUBLE_QUAD,IERR)
+
+      CALL MPI_TYPE_CONTIGUOUS(9,MPI_DOUBLE_PRECISION,DOUBLE_THREE,IERR)
+      CALL MPI_TYPE_COMMIT(DOUBLE_THREE,IERR)
+
+      CALL MPI_TYPE_CONTIGUOUS(3,MPI_DOUBLE_PRECISION,DOUBLE_SOL,IERR)
+      CALL MPI_TYPE_COMMIT(DOUBLE_SOL,IERR)
+
+      CALL SCATTER_D(X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z,SCATTERBUF,
+     $               SCATTERLOCAL,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $               NPERPR_LOC,NPERPR,NATOM,NSITE,PROCS)
+      CALL SCATTER_D(XCF,YCF,ZCF,LOCAL_XCF,LOCAL_YCF,LOCAL_ZCF,
+     $               SCATTERBUF_1,SCATTERLOCAL_1,WATER_LOCAL,DISP,
+     $               DOUBLE_THREE,NPERPR_LOC,NPERPR,NATOM,3,PROCS)
+      CALL SCATTER(POSF,LOCAL_POSF,SCATTERBUF_2,SCATTERLOCAL_2,
+     $             SOLUTE_LOCAL,SOL_DISP,DOUBLE_SOL,NFP_LOC,NFP,
+     $             NATOMS,3,PROCS)
+      CALL SCATTER(POSCF,LOCAL_POSCF,SCATTERBUF_2,SCATTERLOCAL_2,
+     $             SOLUTE_LOCAL,SOL_DISP,DOUBLE_SOL,NFP_LOC,NFP,
+     $             NATOMS,3,PROCS)
+C
+C     Initialize variables
+C
+      CALL INITIAL(TEMP,DT,DT2,BOXL,BOXLI,VOLUME,ALPHA,SIGMA,
+     $             A2,A22I,FACT,FACT2,FACTOR,ETAVE,EPAVE,EKAVE,
+     $             TAVE,PAVE,ETAVE2,EPAVE2,TAVE2,PAVE2,THKE0,
+     $             THPEM,DNF,CONSTM,GNKT,GKT,TAUP,TMAS,WDT2,WDT4,
+     $             WDT8,GT,VETA,PI,CHI,MC,NTC,NYS,ICHECK,JCHECK,
+     $             KCHECK,ISSE,NK,ICHUNK,NRIGID,NPRIM,NCONST,
+     $             NSOL,NATSOL,ITER2,KMAX)
+C
+C     Remove overlapping solvent centers if desired
+C
+      IF (NOMIT.EQ.1) THEN
+      CALL SOLOMIT(X,Y,Z,VX,VY,VZ,POSF,BOXL,BOXLI,EOMIT,NATOM,NSITE,
+     $             NRIGID,NFLEX,NATOMS,NSOL,NATSOL)
+      END IF
+C
+C     Write out the initial energy for this starting configuration.
+C
+      CALL ENEDER(X,Y,Z,FX,FY,FZ,POSF,FF,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $            LOCAL_POSF,FF_SUM,ALPHA,SIGMA,PI,A2,A22I,BOXL,
+     $            BOXLI,AMASS,AMASSF,FACT,FACT2,FACTOR,RLOWER,
+     $            RUPPER,RL2,RU2,AS,BS,CS,RLOWS,RUPPS,RLS2,RUS2,
+     $            ASS,BSS,CSS,ENERGY,VK,VIRK,KMAX,NATOM,NSITE,NSOL,
+     $            NATSOL,NRIGID,NPRIM,NATOMS,NPERPR,NFP,RANK,NPERPF,
+     $            DOUBLE_QUAD,DOUBLE_SOL,NPERPR_LOC,NPERPF_LOC,
+     $            NFP_LOC,WATER_LOCAL,SOLUTE_LOCAL,DISP,SOL_DISP,
+     $            PROCS)
+C
+C     If equilibrating, assign initial velocities from Gaussian 
+C     distribution.
+C
+      IF (IEQUIL.EQ.1) THEN
+      IF (RANK.EQ.0) THEN
+      CALL MXWELL(VX,VY,VZ,VELF,AMASS,AMASSF,TEMP,NATOM,NSITE,
+     $            NRIGID,NPRIM,NATOMS,ISEED)
+      END IF
+      END IF
+      
+      CALL MPI_BARRIER(MPI_COMM_WORLD,IERR)
+
+      CALL SCATTER_D(VX,VY,VZ,LOCAL_VX,LOCAL_VY,LOCAL_VZ,SCATTERBUF_1,
+     $               SCATTERLOCAL_1,WATER_LOCAL,DISP,DOUBLE_THREE,
+     $               NPERPR_LOC,NPERPR,NATOM,3,PROCS)
+
+      CALL SCATTER(VELF,LOCAL_VELF,SCATTERBUF_2,SCATTERLOCAL_2,
+     $             SOLUTE_LOCAL,SOL_DISP,DOUBLE_SOL,NFP_LOC,NFP,
+     $             NSATOM,3,PROCS)
+C
+C     Remove the components of the velocities along the constraint.
+C
+      CALL VELSTTR(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $             AMASS,FIXD,BOXL,BOXLI,DMASSI,NATOM,NSITE,NRIGID,
+     $             NPRIM,NPERPR,NPERPR_LOC)
+C
+C     Evaluate initial temperature and atomic kinetic energy.
+C
+      CALL ATKIN(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS,AMASSF,
+     $           AKIN,NATOM,NSITE,NRIGID,NPRIM,NATOMS,NPERPR,NFP,
+     $           NPERPR_LOC,NFP_LOC)
+        EKIN=0.5D0*AKIN/418.4D0
+        ENERGY(11)=EKIN
+        write(6,*)'ekin=',ekin
+C
+C     Evaluate the total energy (including LJ long range correction).
+C
+      CALL LRCLJ(AS,BS,CS,ASPC,CSPC,RUPPER,RLOWER,ELRC,PLRC,NRIGID)
+       ELRCINT=ELRC/VOLUME
+
+        DO I=1,MC
+          THKE0=THKE0+0.5D0*TMAS(I)*VETA(I)*VETA(I)
+        END DO   
+          THPE1=GNKT*ETA(1)
+        DO I=2,MC
+          THPEM=THPEM+GKT*ETA(I)
+        END DO
+          THTE=(THKE0+THPE1+THPEM)/418.4D0
+C
+C     Calculate the initial COM kinetic energy.
+C
+       EKCM=0.0D0
+       DO I=1,NPERPR_LOC
+         VMSUM=0.0D0
+         VXSUM=0.0D0
+         VYSUM=0.0D0
+         VZSUM=0.0D0
+         DO J=1,NPRIM
+           VXSUM=VXSUM+AMASS(I,J)*LOCAL_VX(I,J)
+           VYSUM=VYSUM+AMASS(I,J)*LOCAL_VY(I,J)
+           VZSUM=VZSUM+AMASS(I,J)*LOCAL_VZ(I,J)
+           VMSUM=VMSUM+AMASS(I,J)
+         END DO
+         VCMX=VXSUM/VMSUM
+         VCMY=VYSUM/VMSUM
+         VCMZ=VZSUM/VMSUM
+         EKCM=EKCM+VMSUM*(VCMX*VCMX+VCMY*VCMY+
+     $                    VCMZ*VCMZ)
+       END DO
+       DO N=1,NPERPF_LOC
+         VMSUM=0.0D0
+         VXSUM=0.0D0
+         VYSUM=0.0D0
+         VZSUM=0.0D0
+         DO J=1,NATSOL
+           I=(N-1)*NATSOL+J
+           VXSUM=VXSUM+AMASSF(I)*LOCAL_VELF(I,1)
+           VYSUM=VYSUM+AMASSF(I)*LOCAL_VELF(I,2)
+           VZSUM=VZSUM+AMASSF(I)*LOCAL_VELF(I,3)
+           VMSUM=VMSUM+AMASSF(I)
+         END DO
+         VCMX=VXSUM/VMSUM
+         VCMY=VYSUM/VMSUM
+         VCMZ=VZSUM/VMSUM
+         EKCM=EKCM+VMSUM*(VCMX*VCMX+VCMY*VCMY+
+     $                    VCMZ*VCMZ)
+       END DO
+       EKCM=EKCM/418.4D0
+       ENERGY(12)=EKCM                
+       
+       CALL MPI_REDUCE(ENERGY,ENERGY_T,12,MPI_DOUBLE_PRECISION,MPI_SUM,
+     $                 0,MPI_COMM_WORLD,IERR)            
+       IF(RANK.EQ.0)THEN
+         ENERGY_T(1)=ENERGY_T(1)*0.5D0
+         ENERGY_T(2)=ENERGY_T(2)*0.5D0
+         ENERGY_T(5)=ENERGY_T(5)*0.5D0
+         VK=VK-ENERGY_T(7)-ENERGY_T(8)
+         EPOT=ENERGY_T(1)+ENERGY_T(2)+ENERGY_T(3)+ENERGY_T(4)+
+     $        VK+ENERGY_T(10)
+         EKIN=ENERGY_T(11)         
+         VIRTOT=ENERGY_T(5)+ENERGY_T(6)+VIRK-ENERGY_T(9)
+         PLRCINT=PLRC/VOLUME
+         PINT=(ENERGY_T(12)+PLRCINT+VIRTOT)/(3.0D0*VOLUME*PFACT)       
+         TEMPI=(EKIN*2.0D0*418.4D0)/CONSTM
+         ETOT=EPOT+EKIN+ELRCINT+THTE
+         E0=ETOT
+         WRITE(74,*)ETOT,EPOT,EKIN,TEMPI
+         WRITE(74,*)'PINT=',PINT 
+       END IF
+        write(6,*)'etot=',etot,'epot=',epot
+        CALL MPI_BARRIER(MPI_COMM_WORLD,IERR)     
+C
+C     Loop over number of time steps desired.
+C
+      DO 4 ITER=1,NTOTAL
+
+        CALL MPI_BCAST(EKIN,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,
+     $                 IERR)
+        AKIN_SUM=EKIN*418.4D0*2.0D0
+C
+C     Update the particle velocities, thermostat velocities and 
+C     thermostat positions.
+C
+        CALL NHCINT(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS,
+     $              AMASSF,AKIN_SUM,TMAS,ETA,VETA,GT,WDT2,WDT4,
+     $              WDT8,GNKT,GKT,NTC,NYS,MC,NATOM,NSITE,NRIGID,
+     $              NPRIM,NATOMS,NPERPR,NFP,NPERPR_LOC,NFP_LOC)
+C
+C     Integrate equations of motion using Velocity Verlet algorithm.
+C     Find full time step positions and half step velocities.
+C
+        CALL RATTLRR(LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_XCF,LOCAL_YCF,
+     $               LOCAL_ZCF,LOCAL_VX,LOCAL_VY,LOCAL_VZ,FX,FY,FZ,
+     $               LOCAL_POSF,LOCAL_POSCF,LOCAL_VELF,FF,AMASS,
+     $               AMASSF,AMASSFI,FIXD,DT,TOL,BOXL,BOXLI,DMASSI,
+     $               NATOM,NSITE,NRIGID,NPRIM,NATOMS,ITER,ITER2,NSOL,
+     $               NATSOL,NPERPR,NPERPF,NFP,NPERPR_LOC,NPERPF_LOC,
+     $               NFP_LOC,RANK)
+C
+C     Evaluate energy and forces at full time step.
+C
+        CALL ENEDER(X,Y,Z,FX,FY,FZ,POSF,FF,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $              LOCAL_POSF,FF_SUM,ALPHA,SIGMA,PI,A2,A22I,BOXL,
+     $              BOXLI,AMASS,AMASSF,FACT,FACT2,FACTOR,RLOWER,
+     $              RUPPER,RL2,RU2,AS,BS,CS,RLOWS,RUPPS,RLS2,RUS2,
+     $              ASS,BSS,CSS,ENERGY,VK,VIRK,KMAX,NATOM,NSITE,NSOL,
+     $              NATSOL,NRIGID,NPRIM,NATOMS,NPERPR,NFP,RANK,NPERPF,
+     $              DOUBLE_QUAD,DOUBLE_SOL,NPERPR_LOC,NPERPF_LOC,
+     $              NFP_LOC,WATER_LOCAL,SOLUTE_LOCAL,DISP,SOL_DISP,
+     $              PROCS)
+C
+C     Complete velocity step
+C
+        CALL RATTLVV(LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_VX,LOCAL_VY,
+     $               LOCAL_VZ,FX,FY,FZ,LOCAL_VELF,FF,AMASS,AMASSFI,
+     $               FIXD,DT,BOXL,BOXLI,DMASSI,NATOM,NSITE,NRIGID,
+     $               NPRIM,NATOMS,NSOL,NATSOL,ITER,NPERPR,NPERPF,
+     $               NFP,NPERPR_LOC,NPERPF_LOC,NFP_LOC,RANK)
+
+        CALL ATKIN(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS,
+     $             AMASSF,AKIN,NATOM,NSITE,NRIGID,NPRIM,NATOMS,
+     $             NPERPR,NFP,NPERPR_LOC,NFP_LOC)
+
+        CALL MPI_ALLREDUCE(AKIN,AKIN_SUM,1,MPI_DOUBLE_PRECISION,
+     $                     MPI_SUM,MPI_COMM_WORLD,IERR)         
+C
+C     Update the particle velocities, thermostat velocities and 
+C     thermostat positions.
+C
+        CALL NHCINT(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS,
+     $              AMASSF,AKIN_SUM,TMAS,ETA,VETA,GT,WDT2,WDT4,
+     $              WDT8,GNKT,GKT,NTC,NYS,MC,NATOM,NSITE,NRIGID,
+     $              NPRIM,NATOMS,NPERPR,NFP,NPERPR_LOC,NFP_LOC)
+C
+C     Evaluate instantaneous temperature and atomic kinetic energy 
+C     at full time step.
+C
+        CALL ATKIN(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS,
+     $             AMASSF,AKIN,NATOM,NSITE,NRIGID,NPRIM,NATOMS,
+     $             NPERPR,NFP,NPERPR_LOC,NFP_LOC)
+         EKIN=0.5D0*AKIN/418.4D0
+         ENERGY(11)=EKIN
+C
+C     Evaluate the thermostat kinetic and potential energy.
+C
+        THKE=0.0D0
+        THPE2=0.0D0
+        DO I=1,MC
+          THKE=THKE+0.5D0*TMAS(I)*VETA(I)*VETA(I)
+        END DO   
+          THPE1=GNKT*ETA(1)
+        DO I=2,MC
+          THPE2=THPE2+GKT*ETA(I)
+        END DO
+          THTE=(THKE+THPE1+THPE2)/418.4D0
+C
+C     Calculate the COM kinetic energy.
+C
+       EKCM=0.0D0
+       DO I=1,NPERPR_LOC
+         VMSUM=0.0D0
+         VXSUM=0.0D0
+         VYSUM=0.0D0
+         VZSUM=0.0D0
+         DO J=1,NPRIM
+           VXSUM=VXSUM+AMASS(I,J)*LOCAL_VX(I,J)
+           VYSUM=VYSUM+AMASS(I,J)*LOCAL_VY(I,J)
+           VZSUM=VZSUM+AMASS(I,J)*LOCAL_VZ(I,J)
+           VMSUM=VMSUM+AMASS(I,J)
+         END DO
+         VCMX=VXSUM/VMSUM
+         VCMY=VYSUM/VMSUM
+         VCMZ=VZSUM/VMSUM
+         EKCM=EKCM+VMSUM*(VCMX*VCMX+VCMY*VCMY+
+     $                    VCMZ*VCMZ)
+       END DO
+       DO N=1,NPERPF_LOC
+         VMSUM=0.0D0
+         VXSUM=0.0D0
+         VYSUM=0.0D0
+         VZSUM=0.0D0
+         DO J=1,NATSOL
+           I=(N-1)*NATSOL+J
+           VXSUM=VXSUM+AMASSF(I)*LOCAL_VELF(I,1)
+           VYSUM=VYSUM+AMASSF(I)*LOCAL_VELF(I,2)
+           VZSUM=VZSUM+AMASSF(I)*LOCAL_VELF(I,3)
+           VMSUM=VMSUM+AMASSF(I)
+         END DO
+         VCMX=VXSUM/VMSUM
+         VCMY=VYSUM/VMSUM
+         VCMZ=VZSUM/VMSUM
+         EKCM=EKCM+VMSUM*(VCMX*VCMX+VCMY*VCMY+
+     $                    VCMZ*VCMZ)
+       END DO            
+       EKCM=EKCM/418.4D0
+       ENERGY(12)=EKCM
+C
+       CALL MPI_REDUCE(ENERGY,ENERGY_T,12,MPI_DOUBLE_PRECISION,MPI_SUM,
+     $                 0,MPI_COMM_WORLD,IERR)            
+       IF(RANK.EQ.0)THEN
+         ENERGY_T(1)=ENERGY_T(1)*0.5D0
+         ENERGY_T(2)=ENERGY_T(2)*0.5D0
+         ENERGY_T(5)=ENERGY_T(5)*0.5D0
+         VK=VK-ENERGY_T(7)-ENERGY_T(8)
+         EPOT=ENERGY_T(1)+ENERGY_T(2)+ENERGY_T(3)+ENERGY_T(4)+
+     $        VK+ENERGY_T(10)
+         EKIN=ENERGY_T(11)         
+         VIRTOT=ENERGY_T(5)+ENERGY_T(6)+VIRK-ENERGY_T(9)
+         PLRCINT=PLRC/VOLUME
+         PINT=(ENERGY_T(12)+PLRCINT+VIRTOT)/(3.0D0*VOLUME*PFACT)       
+         TEMPS=(EKIN*2.0D0*418.4D0)/CONSTM
+         ETOT=EPOT+EKIN+ELRCINT+THTE 
+       END IF
+
+C     Evaluate the average energy deviationns.
+C
+       IF(RANK.EQ.0)THEN
+       ENINT=DABS((ETOT-E0)/E0)
+       CHI=(CHI*(ITER-1)+ENINT)/DFLOAT(ITER)
+       IF(MOD(ITER,10000).EQ.0)THEN
+       WRITE(1,*)ITER,ENINT,CHI
+       END IF
+       END IF 
+C
+C     Save the position and velocity.
+C
+        IF (ITER.GT.NEQ) THEN
+          ISSE=ISSE+1
+C
+C     In chunks of finite time duration.
+C
+c          ISAVE=2**NK+ICHUNK
+c          IF (ISSE.EQ.ISAVE) THEN
+c            CALL GATHERL_D(XCF,YCF,ZCF,LOCAL_XCF,LOCAL_YCF,LOCAL_ZCF,
+c     $                     SCATTERBUF_1,SCATTERLOCAL_1,DOUBLE_THREE,
+c     $                     NPERPR,NATOM,3)
+c            CALL GATHERL(POSCF,LOCAL_POSCF,SCATTERBUF_2,SCATTERLOCAL_2,
+c     $                   DOUBLE_SOL,NFP,NATOMS,3)      
+c           IF(RANK.EQ.0)THEN
+c           DO I=1,NRIGID
+c              WRITE(2) XCF(I,1), YCF(I,1), ZCF(I,1)
+c              WRITE(3) XCF(I,2), YCF(I,2), ZCF(I,2)
+c              WRITE(3) XCF(I,3), YCF(I,3), ZCF(I,3)
+c           END DO 
+c            DO I=1,NATOMS
+c              WRITE(4) POSCF(I,1), POSCF(I,2), POSCF(I,3)
+c            END DO
+c           END IF 
+c            NK=NK+1
+c            IF (NK.EQ.NC) THEN
+c              ICHUNK=ICHUNK+NCHUNK
+c              NK=0
+c            ENDIF
+c          ENDIF
+C
+C     In short intervals of entire trajectory.
+C
+       IF(MOD(ISSE,40).EQ.0) THEN
+         CALL GATHERL_D(XCF,YCF,ZCF,LOCAL_XCF,LOCAL_YCF,LOCAL_ZCF,
+     $                  SCATTERBUF_1,SCATTERLOCAL_1,DOUBLE_THREE,
+     $                  NPERPR,NPERPR_LOC,WATER_LOCAL,DISP,NATOM,
+     $                  3,PROCS)
+         CALL GATHERL(POSCF,LOCAL_POSCF,SCATTERBUF_2,SCATTERLOCAL_2,
+     $                DOUBLE_SOL,NFP,NFP_LOC,SOLUTE_LOCAL,SOL_DISP,
+     $                NATOMS,3,PROCS)      
+         IF(ISSE.LE.3000000) THEN
+           IF(RANK.EQ.0)THEN
+           DO I=1,NRIGID
+             WRITE(7) XCF(I,1), YCF(I,1), ZCF(I,1)
+             WRITE(8) XCF(I,2), YCF(I,2), ZCF(I,2)
+             WRITE(8) XCF(I,3), YCF(I,3), ZCF(I,3)
+           END DO
+           DO I=1,NATOMS
+             WRITE(9) POSCF(I,1), POSCF(I,2), POSCF(I,3)
+           END DO
+           END IF
+         ELSEIF(ISSE.GT.3000000.AND.ISSE.LE.6000000) THEN
+           IF(RANK.EQ.0)THEN
+           CLOSE(7)
+           CLOSE(8)
+           CLOSE(9)
+           DO I=1,NRIGID
+             WRITE(10) XCF(I,1), YCF(I,1), ZCF(I,1)
+             WRITE(11) XCF(I,2), YCF(I,2), ZCF(I,2)
+             WRITE(11) XCF(I,3), YCF(I,3), ZCF(I,3)
+           END DO
+           DO I=1,NATOMS
+             WRITE(12) POSCF(I,1), POSCF(I,2), POSCF(I,3)
+           END DO
+           END IF
+         ELSE
+           IF(RANK.EQ.0)THEN
+           CLOSE(10)
+           CLOSE(11)
+           CLOSE(12)
+           DO I=1,NRIGID
+             WRITE(13) XCF(I,1), YCF(I,1), ZCF(I,1)
+             WRITE(14) XCF(I,2), YCF(I,2), ZCF(I,2)
+             WRITE(14) XCF(I,3), YCF(I,3), ZCF(I,3)
+           END DO
+           DO I=1,NATOMS
+             WRITE(15) POSCF(I,1), POSCF(I,2), POSCF(I,3)
+           END DO
+           END IF
+         END IF
+       END IF
+
+       IF(RANK.EQ.0)THEN
+C
+C     Keep track of energy and temperature averages.
+C
+        ETAVE=ETAVE+ETOT
+        ETAVE2=ETAVE2+ETOT*ETOT
+        EPAVE=EPAVE+EPOT
+        EPAVE2=EPAVE2+EPOT*EPOT
+        EKAVE=EKAVE+EKIN
+        TAVE=TAVE+TEMPS
+        TAVE2=TAVE2+TEMPS*TEMPS
+        PAVE=PAVE+PINT
+        PAVE2=PAVE2+PINT*PINT
+C
+C     Write the equilibrated PE, PINT, TEMPI, and VOLUME.
+C
+         IF ((ISSE/IWRITE).EQ.ICHECK)THEN
+          WRITE(36,82)ISSE,ETOT
+          WRITE(37,82)ISSE,EPOT
+          WRITE(38,82)ISSE,TEMPS
+          WRITE(39,82)ISSE,PINT
+   82     FORMAT(2X,I12,2X,F14.8) 
+          ICHECK=ICHECK+1
+         ENDIF
+       END IF
+      END IF
+C
+C     Write the instantneous PE, PINT, TEMI, and BOXL.
+C
+        IF ((ITER/JWRITE).EQ.JCHECK) THEN
+          IF(RANK.EQ.0)THEN
+          WRITE(40,83)ITER,ETOT,EPOT,TEMPS,PINT
+   83     FORMAT(2X,I12,4(2X,F14.8)) 
+          JCHECK=JCHECK+1
+          ENDIF
+        ENDIF
+C
+C     Write the configuration and velocity for next run. 
+C
+        IF ((ITER/KWRITE).EQ.KCHECK) THEN
+         CALL GATHERL_D(VX,VY,VZ,LOCAL_VX,LOCAL_VY,LOCAL_VZ,
+     $                  SCATTERBUF_1,SCATTERLOCAL_1,DOUBLE_THREE,
+     $                  NPERPR,NPERPR_LOC,WATER_LOCAL,DISP,NATOM,
+     $                  3,PROCS)
+         CALL GATHERL(VELF,LOCAL_VELF,SCATTERBUF_2,SCATTERLOCAL_2,
+     $                DOUBLE_SOL,NFP,NFP_LOC,SOLUTE_LOCAL,SOL_DISP,
+     $                NATOMS,3,PROCS)      
+          IF(RANK.EQ.0)THEN
+          WRITE(41,*)'COORD SET=',ITER
+          WRITE(42,*)'VEL SET=',ITER
+          write(43,*)'COORD SET WPBC=',ITER
+          DO 9 I=1,NRIGID 
+           DO 8 J=1,NPRIM
+             WRITE(41,84)X(I,J),Y(I,J),Z(I,J)
+             WRITE(42,84)VX(I,J),VY(I,J),VZ(I,J)
+             WRITE(43,84)XCF(I,J),YCF(I,J),ZCF(I,J)
+   84        FORMAT(1X,3(1X,F22.16))  
+   8       CONTINUE
+   9      CONTINUE
+          WRITE(41,*)'COORD SET SOLUTE=',ITER
+          WRITE(42,*)'VEL SET SOLUTE=',ITER
+          WRITE(43,*)'COORD SET SOLUTE WPBC=',ITER
+          DO 11 I=1,NSOL
+            DO 10 K=1,NATSOL
+              J=(I-1)*NATSOL+K
+              WRITE(41,85)POSF(J,1),POSF(J,2),POSF(J,3)
+              WRITE(42,85)VELF(J,1),VELF(J,2),VELF(J,3)
+              WRITE(43,85)POSCF(J,1),POSCF(J,2),POSCF(J,3)
+   85         FORMAT(1X,3(1X,F22.16))
+   10       CONTINUE
+   11     CONTINUE
+            WRITE(44,*)'THERMOSTAT POSITION=',ITER
+            WRITE(45,*)'THERMOSTAT VELOCITY=',ITER
+            WRITE(44,*)ETA(1),ETA(2),ETA(3),ETA(4),ETA(5)
+            WRITE(45,*)VETA(1),VETA(2),VETA(3),VETA(4),VETA(5)
+            WRITE(46,*)'AVERAGE QUANTITIES=',ITER
+            WRITE(46,*)ETAVE,ETAVE2,EPAVE,EPAVE2
+            WRITE(46,*)EKAVE,TAVE,TAVE2,PAVE,PAVE2
+        SUMX=0.0D0
+        SUMY=0.0D0
+        SUMZ=0.0D0
+        MSUM=0.0D0
+        DO I=1,NRIGID
+          DO J=1,NPRIM
+            SUMX=SUMX+AMASS(I,J)*VX(I,J)
+            SUMY=SUMY+AMASS(I,J)*VY(I,J)
+            SUMZ=SUMZ+AMASS(I,J)*VZ(I,J)
+            MSUM=MSUM+AMASS(I,J)
+          END DO
+        END DO
+        DO I=1,NSOL
+          DO K=1,NATSOL
+            J=(I-1)*NATSOL+K
+            SUMX=SUMX+AMASSF(J)*VELF(J,1)
+            SUMY=SUMY+AMASSF(J)*VELF(J,2)
+            SUMZ=SUMZ+AMASSF(J)*VELF(J,3)
+            MSUM=MSUM+AMASSF(J)
+          END DO
+        END DO
+        WRITE(77,*)SUMX/MSUM,SUMY/MSUM,SUMZ/MSUM
+        END IF          
+          KCHECK=KCHECK+1
+        END IF
+
+c       WRITE(6,*)ITER       
+   4  CONTINUE
+          DITER=DFLOAT(ISSE)
+          IF(RANK.EQ.0)THEN
+          WRITE(47,*)'                     RUN AVERAGES '
+          WRITE(47,*)' Average TE                Average TE2'
+          WRITE(47,*)' ',ETAVE/DITER,'             ',ETAVE2/DITER
+          WRITE(47,*)' Average PE                Average PE2'
+          WRITE(47,*)' ',EPAVE/DITER,'             ',EPAVE2/DITER
+          WRITE(47,*)' Average TEMP              Average TEMP2 '
+          WRITE(47,*)' ',TAVE/DITER,'              ',TAVE2/DITER
+          WRITE(47,*)' Average PINT              Average PINT2'
+          WRITE(47,*)' ',PAVE/DITER,'             ', PAVE2/DITER
+          END IF
+      CALL MPI_BARRIER(MPI_COMM_WORLD,IERR)
+      CALL MPI_FINALIZE(IERR)
+      STOP
+      END
+
+      SUBROUTINE SIMPARM(DT,TEMP,DENSITY,BOXL,BOXLI,TOL,RLOWER,
+     $                   RUPPER,RL2,RU2,AS,BS,CS,RLOWS,RUPPS,RLS2,
+     $                   RUS2,ASS,BSS,CSS,EOMIT,ETA,VETA,TAUP,MC,NTC,
+     $                   NYS,NRIGID,NFLEX,NATFLEX,IEQUIL,ISEED,NTOTAL,
+     $                   NEQ,IWRITE,JWRITE,KWRITE,NCONST,NATOMD,NOMIT,
+     $                   NC,NCHUNK)
+      IMPLICIT NONE
+      INTEGER NRIGID,NFLEX,NATOMD,IEQUIL,ISEED,NTOTAL,NEQ,IWRITE
+      INTEGER JWRITE,KWRITE,NCONST,NOMIT,NAVESTRT,NC,NCHUNK,NATFLEX
+      INTEGER I,MC,NTC,NYS
+      DOUBLE PRECISION DT,TEMP,RHOM,DENSITY,BOXL,BOXL2,BOXLI,TOL
+      DOUBLE PRECISION RLOWER,RUPPER,RL2,RU2,RUL,RULS,RULC,RULQ
+      DOUBLE PRECISION RULP,AS,BS,CS,RLOWS,RUPPS,RLS2,RUS2,RUPLW
+      DOUBLE PRECISION RUPLWS,RUPLWC,RUPLWQ,RUPLWP,ASS,BSS,CSS
+      DOUBLE PRECISION EOMIT,ETA,VETA,TAUP
+      DOUBLE PRECISION AVAGN,AMOLW
+      DIMENSION ETA(5),VETA(5)
+      PARAMETER(AVAGN=0.602214199D0,AMOLW=18.01528D0)
+      
+      READ(5,*)
+C
+C     Read in the number of timesteps, NTOTAL; the incremental timestep,
+C     DT; the discretization in histograms, the temperature, TEMP; 
+C     frequency in which certain quantities are written IWRITE,JWRITE,KWRITE; 
+C     a seed for random number generator, ISEED.
+C
+      READ(5,*)NTOTAL,NEQ,DT,TEMP,IWRITE,JWRITE,KWRITE,ISEED
+C
+C     Read in the density, DENSITY; the number of rigid molecules, NRIGID; 
+C     the number of flexible molecules, NFLEX; the number of molecules to
+C     determine density; the equilibration run flag, IEQUIL (1 is equilibrate);
+C     the tolerance for RATTLE convergence, TOL; the number of constraints for
+C     evaluating temperature.
+C
+      READ(5,*)BOXL,NRIGID,NFLEX,NATFLEX,NATOMD,IEQUIL,TOL,NCONST
+      READ(5,*)NOMIT,EOMIT,RLOWER,RUPPER
+      READ(5,*)NC,NCHUNK
+C
+C     Read in the position of the thermostats ETA, XI; velocity of the 
+C     thermostat VETA, VXI; the time scale parameter associated with the 
+C     thermostats and barostat TAUP, TAUB; velocity associted with 
+C     the volume variable VELV. 
+C
+      READ(5,*)
+      READ(5,*)MC,NTC,NYS
+      READ(5,*)(ETA(I),I=1,MC)
+      READ(5,*)(VETA(I),I=1,MC)
+      READ(5,*)TAUP
+C
+C     Evaluate box length, and other quantities associated with periodic
+C     boundary conditions and minimum image convention. 
+C
+      DENSITY=DFLOAT(NATOMD)/(BOXL*BOXL*BOXL)
+
+c      DENSITY=RHOM*AVAGN/AMOLW
+c      BOXL=(DFLOAT(NATOMD)/DENSITY)**(1.0D0/3.0D0)
+      BOXL2=0.5D0*BOXL
+      BOXLI=1.0D0/BOXL     
+      RL2=RLOWER*RLOWER
+      RU2=RUPPER*RUPPER
+      RUL=RUPPER*RUPPER-RLOWER*RLOWER
+      RULS=RUL*RUL
+      RULC=RULS*RUL
+      RULQ=RULS*RULS
+      RULP=RULQ*RUL
+      AS=-10.0D0/RULC
+      BS=15.0D0/RULQ
+      CS=-6.0D0/RULP
+      RLOWS=BOXL2-0.5D0
+      RUPPS=BOXL2
+      RLS2=RLOWS*RLOWS
+      RUS2=RUPPS*RUPPS
+      RUPLW=RUPPS*RUPPS-RLOWS*RLOWS
+      RUPLWS=RUPLW*RUPLW
+      RUPLWC=RUPLWS*RUPLW
+      RUPLWQ=RUPLWS*RUPLWS
+      RUPLWP=RUPLWQ*RUPLW
+      ASS=-10.0D0/RUPLWC
+      BSS=15.0D0/RUPLWQ
+      CSS=-6.0D0/RUPLWP
+      WRITE(6,*)'DENSITY=',DENSITY
+      WRITE(6,*)'BOXL=',BOXL
+      RETURN
+      END
+
+      SUBROUTINE RIGIDMOL(X,Y,Z,XCF,YCF,ZCF,VX,VY,VZ,AMASS,FIXD,
+     $                    BOXL,BOXLI,DMASSI,NATOM,NSITE,NRIGID,
+     $                    NPRIM,NATOMD,IEQUIL)
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,NATOMD,IEQUIL
+      INTEGER I,J,K
+      DOUBLE PRECISION X,Y,Z,XCF,YCF,ZCF,VX,VY,VZ,AMASS,FIXD,DMASSI
+      DOUBLE PRECISION BOXL,BOXLI,RXCM,RYCM,RZCM,ASPC,CSPC,RSPC,ESPC
+      DOUBLE PRECISION Q,MH,MO,AVAGN,AMOLW,FACT,PIDEG,ROH,RHH,RM
+      DOUBLE PRECISION Q2,Q3,Q4,RSPC2,RSPC6,RSPC12,PI,BOXLOLD,BOXLNEW
+      DOUBLE PRECISION SCBOXL,SUMX,SUMY,SUMZ,ASUM,THETAH
+      DOUBLE PRECISION XJK21,YJK21,ZJK21,R21SQ,R21,XJK31,YJK31,ZJK31
+      DOUBLE PRECISION R31SQ,R31,TH,CSTH,THR,THD,XJK32,YJK32,ZJK32
+      DOUBLE PRECISION R32SQ,R32,XB,YB,ZB,RB,SUMVX,SUMVY,SUMVZ,AMSUM
+      DOUBLE PRECISION UX,UY,UZ
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION XCF(NATOM,3),YCF(NATOM,3),ZCF(NATOM,3)
+      DIMENSION VX(NATOM,3),VY(NATOM,3),VZ(NATOM,3)
+      DIMENSION AMASS(NATOM,3),FIXD(3,3)
+      DIMENSION RXCM(NATOM),RYCM(NATOM),RZCM(NATOM)
+      DIMENSION UX(2),UY(2),UZ(2)
+      DIMENSION DMASSI(3)
+      COMMON/WATER/ASPC,CSPC,RSPC,RSPC2,ESPC,Q(1000,4)
+      PARAMETER (AVAGN=0.602214199D0)
+      PARAMETER (AMOLW=18.01528D0)
+      PARAMETER (FACT=332.0637349768129609D0)
+      PARAMETER (PIDEG=180.0D0)
+      PARAMETER (THETAH=104.52D0)
+      PARAMETER (ROH=0.9572D0,RHH=1.5139006585D0)
+      PARAMETER (RM=0.12500D0)
+      PARAMETER (MH=1.007276466D0)
+      PARAMETER (MO=16.00072706D0)
+C
+C     Read in the potential function parameters
+C
+      READ(5,*)
+      READ(5,*)RSPC,ESPC,NPRIM
+      READ(5,*)Q2,Q3,Q4
+C
+C     Read in configuration
+C
+      DO 2 I=1,NRIGID
+        DO 1 J=1,NPRIM
+          READ(5,54)X(I,J),Y(I,J),Z(I,J)
+  54      FORMAT(2X,3(2X,F16.12))
+   1    CONTINUE
+   2  CONTINUE
+
+      IF(IEQUIL.EQ.0)THEN
+C
+C     Read in the velocities
+C
+      DO I=1,NRIGID
+        DO J=1,NPRIM
+          READ(64,55)VX(I,J),VY(I,J),VZ(I,J)
+  55      FORMAT(2X,3(2X,F16.12))
+        END DO
+      END DO
+          READ(64,*)
+      END IF   
+C
+C     Eliminate some multiplies
+C
+      Q2=Q2*DSQRT(FACT)
+      Q3=Q3*DSQRT(FACT)
+      Q4=Q4*DSQRT(FACT)
+      RSPC2=RSPC*RSPC
+      RSPC6=RSPC2*RSPC2*RSPC2
+      RSPC12=RSPC6*RSPC6
+      ASPC=4.D0*ESPC*RSPC12
+      CSPC=4.D0*ESPC*RSPC6
+      RSPC2=2.0D0**(1.0D0/6.0D0)*RSPC/2.0D0
+      PI=DACOS(-1.0D0)
+      DMASSI(1)=1.0D0/MO
+      DMASSI(2)=1.0D0/MH
+      DMASSI(3)=1.0D0/MH
+C
+C     Scale factor
+C
+c      BOXLOLD=25.64424644D0
+c      BOXLNEW=BOXL
+c      SCBOXL=BOXLNEW/BOXLOLD
+C
+C     Read in configuration. 
+C
+      DO 4 I=1,NRIGID
+        AMASS(I,1)=MO
+        AMASS(I,2)=MH
+        AMASS(I,3)=MH
+        Q(I,1)=0.0D0
+        Q(I,2)=Q2
+        Q(I,3)=Q3
+        Q(I,4)=Q4
+C
+C    Scale the old configuration
+C
+          SUMX=0.0D0
+          SUMY=0.0D0
+          SUMZ=0.0D0
+          ASUM=0.0D0
+        DO J=1,NPRIM
+          SUMX=SUMX+AMASS(I,J)*X(I,J)
+          SUMY=SUMY+AMASS(I,J)*Y(I,J)
+          SUMZ=SUMZ+AMASS(I,J)*Z(I,J)
+          ASUM=ASUM+AMASS(I,J)
+        END DO
+          RXCM(I)=SUMX/ASUM
+          RYCM(I)=SUMY/ASUM
+          RZCM(I)=SUMZ/ASUM
+        DO K=1,NPRIM
+c          X(I,K)=X(I,K)+(SCBOXL-1.0D0)*RXCM(I)
+c          Y(I,K)=Y(I,K)+(SCBOXL-1.0D0)*RYCM(I)
+c          Z(I,K)=Z(I,K)+(SCBOXL-1.0D0)*RZCM(I)
+          XCF(I,K)=X(I,K)
+          YCF(I,K)=Y(I,K)
+          ZCF(I,K)=Z(I,K)
+        END DO            
+        XJK21=X(I,2)-X(I,1)
+        YJK21=Y(I,2)-Y(I,1)
+        ZJK21=Z(I,2)-Z(I,1)
+        XJK21=XJK21-BOXL*DNINT(XJK21*BOXLI)
+        YJK21=YJK21-BOXL*DNINT(YJK21*BOXLI)
+        ZJK21=ZJK21-BOXL*DNINT(ZJK21*BOXLI)
+        R21SQ=XJK21*XJK21+YJK21*YJK21+ZJK21*ZJK21
+        R21=DSQRT(R21SQ)
+        XJK31=X(I,3)-X(I,1)
+        YJK31=Y(I,3)-Y(I,1)
+        ZJK31=Z(I,3)-Z(I,1)
+        XJK31=XJK31-BOXL*DNINT(XJK31*BOXLI)
+        YJK31=YJK31-BOXL*DNINT(YJK31*BOXLI)
+        ZJK31=ZJK31-BOXL*DNINT(ZJK31*BOXLI)
+        R31SQ=XJK31*XJK31+YJK31*YJK31+ZJK31*ZJK31
+        R31=DSQRT(R31SQ)
+        TH=XJK21*XJK31+YJK21*YJK31+ZJK21*ZJK31
+        CSTH=TH/R21/R31
+        THR=DACOS(CSTH)
+        THD=THR*(PIDEG/PI)      
+        XJK32=X(I,3)-X(I,2)
+        YJK32=Y(I,3)-Y(I,2)
+        ZJK32=Z(I,3)-Z(I,2)
+        XJK32=XJK32-BOXL*DNINT(XJK32*BOXLI)
+        YJK32=YJK32-BOXL*DNINT(YJK32*BOXLI)
+        ZJK32=ZJK32-BOXL*DNINT(ZJK32*BOXLI)
+        R32SQ=XJK32*XJK32+YJK32*YJK32+ZJK32*ZJK32
+        R32=DSQRT(R32SQ)
+        write(50,82)R21,R31,R32,THD
+   82   format(4(1x,f16.12))  
+        XB=0.5D0*(XJK21+XJK31)
+        YB=0.5D0*(YJK21+YJK31)
+        ZB=0.5D0*(ZJK21+ZJK31)
+        RB=DSQRT(XB*XB+YB*YB+ZB*ZB)
+        X(I,4)=X(I,1)+RM*XB/RB
+        Y(I,4)=Y(I,1)+RM*YB/RB
+        Z(I,4)=Z(I,1)+RM*ZB/RB
+        DO J=1,NSITE
+        WRITE(90,56)X(I,J),Y(I,J),Z(I,J)
+        WRITE(92,56)VX(I,J),VY(I,J),VZ(I,J)
+  56    FORMAT(2X,3(2X,F16.12))
+        END DO    
+    4 CONTINUE
+        FIXD(1,2)=ROH
+        FIXD(2,1)=FIXD(1,2)
+        FIXD(1,3)=ROH
+        FIXD(3,1)=FIXD(1,3)
+        FIXD(2,3)=RHH
+        FIXD(3,2)=FIXD(2,3)
+      RETURN
+      END
+
+      SUBROUTINE FLEXIMOL(X,Y,Z,VX,VY,VZ,POSF,POSCF,VELF,AMASS,AMASSF,
+     $                    AMASSFI,BOXL,BOXLI,NATOM,NSITE,NSOL,NATSOL,
+     $                    IEQUIL,NATOMS,NRIGID,NPRIM,NFLEX,NSATOM,
+     $                    NPERPF,NPERPF_LOC)
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NFLEX,NSOL,NATSOL,IEQUIL,NATOMS,NRIGID
+      INTEGER NPRIM,NBOND,IBOND,JBOND,NANGLE,IANGLE,JANGLE,KANGLE
+      INTEGER NDIHE,IDIHE,JDIHE,KDIHE,LDIHE,NP,NIMP,IIMP,JIMP
+      INTEGER KIMP,LIMP,NBON14,INBON14,JNBON14,NBON,INBON,JNBON
+      INTEGER I,J,K,L,IB,JB,IA,JA,KA,ID,JD,KD,LD,NPT,IP,JP,KP,LP
+      INTEGER NSATOM,NPERPF,NPERPF_LOC
+      DOUBLE PRECISION X,Y,Z,VX,VY,VZ,POSF,POSCF,VELF
+      DOUBLE PRECISION AMASS,AMASSF,AMASSFI
+      DOUBLE PRECISION BOXL,BOXLI,FCB,R0,FCA,A0,FCD,D0,FCP,P0
+      DOUBLE PRECISION RSOL,ESOL,RWSOL,EWSOL,BOXLOLD,BOXLNEW,SCBOXL
+      DOUBLE PRECISION SCVDW14,SCELE14,ASPC,CSPC,RSPC,RSPC2
+      DOUBLE PRECISION ESPC,Q,QF,FACT,PIDEG,AM,A,C,QQ,FCBT,R0T
+      DOUBLE PRECISION PI,FCAT,A0T,FCDT,D0T,FCPT,P0T
+      DOUBLE PRECISION XSUM,YSUM,ZSUM,MSUM,SUMX,SUMY,SUMZ,AMSUM
+      DOUBLE PRECISION RXCMF,RYCMF,RZCMF,XPBC,YPBC,ZPBC
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION VX(NATOM,3),VY(NATOM,3),VZ(NATOM,3)
+      DIMENSION POSF(NSATOM,3),POSCF(NSATOM,3),VELF(NSATOM,3)
+      DIMENSION AMASS(NATOM,3),AMASSF(NSATOM),AMASSFI(NSATOM)
+      DIMENSION RXCMF(NFLEX),RYCMF(NFLEX),RZCMF(NFLEX)
+      COMMON/BOND/FCB(2000),R0(2000),NBOND,IBOND(2000),JBOND(2000)
+      COMMON/ANGLE/FCA(2000),A0(2000),NANGLE,IANGLE(2000),
+     $             JANGLE(2000),KANGLE(2000)
+      COMMON/DIHE/FCD(2000),D0(2000),NDIHE,IDIHE(2000),JDIHE(2000),
+     $            KDIHE(2000),LDIHE(2000),NP(2000)
+      COMMON/IMPR/FCP(2000),P0(2000),NIMP,IIMP(2000),JIMP(2000),
+     $            KIMP(2000),LIMP(2000)
+      COMMON/FLEXI/RSOL(2000),ESOL(2000),RWSOL(2000),EWSOL(2000),
+     $             SCVDW14,SCELE14,NBON14,INBON14(2000),
+     $             JNBON14(2000),NBON,INBON(5000),JNBON(5000)
+      COMMON/WATER/ASPC,CSPC,RSPC,RSPC2,ESPC,Q(1000,4)
+      COMMON/SOLUT/QF(1000)
+      CHARACTER*80 LINE 
+      PARAMETER (FACT=332.0637349768129609D0)
+      PARAMETER (PIDEG=180.0D0)
+C
+C     Read in the number of solute atoms, solute bonds, solute angles,
+C     and solute dihedrals
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      READ(5,*)NSOL,NATSOL,NBOND,NANGLE,NDIHE,NIMP,NBON14,NBON,
+     $         SCVDW14,SCELE14
+C
+C     Read in mass and nbonded parameters for each atom.
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      DO 2 I=1,NATSOL
+        READ(5,*)AM,A,C,QQ
+        DO 1 J=1,NSOL 
+          K=(J-1)*NATSOL+I
+          AMASSF(K)=AM
+          RSOL(K)=A
+          ESOL(K)=C
+          QF(K)=QQ*DSQRT(FACT)
+    1   CONTINUE 
+    2 CONTINUE 
+C
+C     Read in the potential function parameters for harmonic bonds
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      DO 4 I=1,NBOND
+        READ(5,*)IB,JB,FCBT,R0T
+        DO 3 J=1,NPERPF_LOC
+          K=(J-1)*NBOND+I
+          FCB(K)=FCBT
+          R0(K)=R0T
+          IBOND(K)=(J-1)*NATSOL+IB
+          JBOND(K)=(J-1)*NATSOL+JB
+    3   CONTINUE
+    4 CONTINUE
+      NBOND=NPERPF_LOC*NBOND
+C
+C     Read in the potential function parameters for harmonic angle bends
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      PI=DACOS(-1.0D0)
+      DO 6 I=1,NANGLE
+        READ(5,*)IA,JA,KA,FCAT,A0T
+        A0T=A0T*PI/PIDEG
+        DO 5 J=1,NPERPF_LOC
+          K=(J-1)*NANGLE+I
+          FCA(K)=FCAT
+          A0(K)=A0T
+          IANGLE(K)=(J-1)*NATSOL+IA
+          JANGLE(K)=(J-1)*NATSOL+JA
+          KANGLE(K)=(J-1)*NATSOL+KA
+    5   CONTINUE
+    6 CONTINUE
+      NANGLE=NPERPF_LOC*NANGLE
+C
+C     Read in the parameters for cosine fourier description of dihedrals
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      DO 8 I=1,NDIHE
+        READ(5,*)ID,JD,KD,LD,FCDT,NPT,D0T
+        D0T=D0T*PI/PIDEG
+        DO 7 J=1,NPERPF_LOC
+          K=(J-1)*NDIHE+I
+          FCD(K)=FCDT
+          NP(K)=NPT
+          D0(K)=D0T
+          IDIHE(K)=(J-1)*NATSOL+ID
+          JDIHE(K)=(J-1)*NATSOL+JD
+          KDIHE(K)=(J-1)*NATSOL+KD
+          LDIHE(K)=(J-1)*NATSOL+LD
+    7   CONTINUE
+    8 CONTINUE
+      NDIHE=NPERPF_LOC*NDIHE
+C
+C     Read in the potential function parameters for improper dihedrals
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      DO 10 I=1,NIMP
+        READ(5,*)IP,JP,KP,LP,FCPT,P0T
+        P0T=P0T*PI/PIDEG
+        DO 9 J=1,NPERPF_LOC
+          K=(J-1)*NIMP+I
+          FCP(K)=FCPT
+          P0(K)=P0T
+          IIMP(K)=(J-1)*NATSOL+IP
+          JIMP(K)=(J-1)*NATSOL+JP
+          KIMP(K)=(J-1)*NATSOL+KP
+          LIMP(K)=(J-1)*NATSOL+LP
+    9   CONTINUE
+   10 CONTINUE
+      NIMP=NPERPF_LOC*NIMP
+C 
+C     Read in the nbonded list for internal 1-4 interactions
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      DO 12 I=1,NBON14
+        READ(5,*)IB,JB
+        DO 11 J=1,NPERPF_LOC 
+          K=(J-1)*NBON14+I
+          INBON14(K)=(J-1)*NATSOL+IB
+          JNBON14(K)=(J-1)*NATSOL+JB
+   11   CONTINUE
+   12 CONTINUE
+      NBON14=NPERPF_LOC*NBON14
+C 
+C     Read in the nbonded list for internal 1-n interactions, n > 4
+C
+      READ(5,*)
+      READ(5,'(A80)')LINE
+      DO 14 I=1,NBON
+        READ(5,*)IB,JB
+        DO 13 J=1,NPERPF_LOC 
+          K=(J-1)*NBON+I
+          INBON(K)=(J-1)*NATSOL+IB
+          JNBON(K)=(J-1)*NATSOL+JB
+   13   CONTINUE
+   14 CONTINUE
+      NBON=NPERPF_LOC*NBON
+C
+C     Read in coordinates for flexible molecules
+C     
+      NATOMS=0
+      DO 16 L=1,NSOL
+        XSUM=0.0D0
+        YSUM=0.0D0
+        ZSUM=0.0D0
+        MSUM=0.0D0
+        DO 15 J=1,NATSOL
+          NATOMS=NATOMS+1
+          I=NATOMS
+          READ(5,55)POSF(I,1),POSF(I,2),POSF(I,3)
+          IF (IEQUIL.EQ.0)READ(64,55)VELF(I,1),VELF(I,2),VELF(I,3)
+   55     FORMAT(2X,3(2X,F16.12))  
+          XSUM=XSUM+AMASSF(I)*POSF(I,1)
+          YSUM=YSUM+AMASSF(I)*POSF(I,2)
+          ZSUM=ZSUM+AMASSF(I)*POSF(I,3)
+          MSUM=MSUM+AMASSF(I)
+   15   CONTINUE
+        RXCMF(L)=XSUM/MSUM
+        RYCMF(L)=YSUM/MSUM
+        RZCMF(L)=ZSUM/MSUM
+   16 CONTINUE
+
+      WRITE(74,*)'MOLWT OF SOLUTE=',MSUM 
+      WRITE(90,*)'CONFIG SOLUTE'
+      WRITE(92,*)'VEL SOLUTE'
+C
+C     Scale factor
+C
+c      BOXLOLD=25.64424644D0
+c      BOXLNEW=BOXL
+c      SCBOXL=BOXLNEW/BOXLOLD
+     
+      DO 19 L=1,NSOL
+c        XPBC=BOXL*DNINT(RXCMF(L)*BOXLI)
+c        YPBC=BOXL*DNINT(RYCMF(L)*BOXLI)
+c        ZPBC=BOXL*DNINT(RZCMF(L)*BOXLI)
+        DO 18 J=1,NATSOL
+          I=(L-1)*NATSOL+J
+c          POSF(I,1)=POSF(I,1)-XPBC
+c          POSF(I,2)=POSF(I,2)-YPBC
+c          POSF(I,3)=POSF(I,3)-ZPBC
+c          POSF(I,1)=POSF(I,1)+(SCBOXL-1.0D0)*RXCMF(L)
+c          POSF(I,2)=POSF(I,2)+(SCBOXL-1.0D0)*RYCMF(L)
+c          POSF(I,3)=POSF(I,3)+(SCBOXL-1.0D0)*RZCMF(L)
+          POSCF(I,1)=POSF(I,1)
+          POSCF(I,2)=POSF(I,2)
+          POSCF(I,3)=POSF(I,3)
+          WRITE(90,56)POSF(I,1),POSF(I,2),POSF(I,3)
+          WRITE(92,56)VELF(I,1),VELF(I,2),VELF(I,3)
+   56     FORMAT(2X,3(2X,F16.12))  
+   18   CONTINUE
+   19 CONTINUE
+C
+      IF(IEQUIL.EQ.0) THEN   
+C
+C     Make the center of mass a fixed point
+C 
+       SUMX=0.0D0
+       SUMY=0.0D0
+       SUMZ=0.0D0
+       AMSUM=0.0D0
+       DO 21 I=1,NRIGID
+         DO 20 J=1,NPRIM
+           SUMX=SUMX+AMASS(I,J)*VX(I,J)
+           SUMY=SUMY+AMASS(I,J)*VY(I,J)
+           SUMZ=SUMZ+AMASS(I,J)*VZ(I,J)
+           AMSUM=AMSUM+AMASS(I,J)
+   20    CONTINUE
+   21  CONTINUE
+       DO 22 I=1,NATOMS
+         SUMX=SUMX+AMASSF(I)*VELF(I,1)
+         SUMY=SUMY+AMASSF(I)*VELF(I,2)
+         SUMZ=SUMZ+AMASSF(I)*VELF(I,3)
+         AMSUM=AMSUM+AMASSF(I)
+   22  CONTINUE
+         SUMX=SUMX/AMSUM
+         SUMY=SUMY/AMSUM
+         SUMZ=SUMZ/AMSUM
+       DO 24 I=1,NRIGID
+         DO 23 J=1,NPRIM
+           VX(I,J)=VX(I,J)-SUMX
+           VY(I,J)=VY(I,J)-SUMY
+           VZ(I,J)=VZ(I,J)-SUMZ
+   23    CONTINUE
+   24  CONTINUE
+       DO 25 I=1,NATOMS
+         VELF(I,1)=VELF(I,1)-SUMX
+         VELF(I,2)=VELF(I,2)-SUMY
+         VELF(I,3)=VELF(I,3)-SUMZ
+   25  CONTINUE
+      END IF
+C
+      DO 26 I=1,NATOMS
+        RWSOL(I)=RSPC2+RSOL(I)
+        EWSOL(I)=DSQRT(ESPC*ESOL(I))
+        AMASSFI(I)=1.D0/AMASSF(I)
+   26 CONTINUE    
+      RETURN
+      END
+
+      SUBROUTINE INITIAL(TEMP,DT,DT2,BOXL,BOXLI,VOLUME,ALPHA,SIGMA,
+     $                   A2,A22I,FACT,FACT2,FACTOR,ETAVE,EPAVE,EKAVE,
+     $                   TAVE,PAVE,ETAVE2,EPAVE2,TAVE2,PAVE2,THKE0,
+     $                   THPEM,DNF,CONSTM,GNKT,GKT,TAUP,TMAS,WDT2,
+     $                   WDT4,WDT8,GT,VETA,PI,CHI,MC,NTC,NYS,ICHECK,
+     $                   JCHECK,KCHECK,ISSE,NK,ICHUNK,NRIGID,NPRIM,
+     $                   NCONST,NSOL,NATSOL,ITER2,KMAX)
+      IMPLICIT NONE
+      INTEGER ITER2,KMAX,ICHECK,JCHECK,KCHECK,ISSE,MC,NTC,NYS
+      INTEGER NRIGID,NPRIM,NCONST,NSOL,NATSOL,NK,ICHUNK,I
+      DOUBLE PRECISION CHI,PI,TWOPI,ALPHA,SIGMA,A2,A22I,DT,DT2
+      DOUBLE PRECISION FACT,FACT2,FACTOR,ETAVE,EPAVE,EKAVE,TAVE
+      DOUBLE PRECISION PAVE,ETAVE2,EPAVE2,TAVE2,PAVE2,THKE0,THPEM
+      DOUBLE PRECISION DNF,CONSTM,TEMP,BOXL,BOXLI,VOLUME,BOLTZK
+      DOUBLE PRECISION GNKT,GKT,TAUP,TMAS,W,WDT2,WDT4,WDT8,GT,VETA
+      DOUBLE PRECISION VECK,V,RINCR,RINCRI
+      DIMENSION W(5),WDT2(5),WDT4(5),WDT8(5)
+      DIMENSION VETA(5),GT(5),TMAS(5)
+      PARAMETER (BOLTZK=0.83144703385D0)
+      COMMON/KVEC/VECK(10000)
+      COMMON/VTABLE/V(4,500000),RINCR,RINCRI
+C
+C     Initialize energy and temperature quantities.
+C
+      PI=DACOS(-1.0D0)
+      TWOPI=2.0D0*PI
+      DT2=0.5D0*DT
+      ITER2=50
+      ALPHA=0.35D0
+      A2=ALPHA*ALPHA
+      SIGMA=1.0D0/4.0D0/ALPHA/ALPHA
+      A22I=2.0D0*SIGMA
+      FACT=ALPHA/DSQRT(PI)
+      FACT2=TWOPI*BOXLI
+      FACTOR=2.0D0/DSQRT(PI)
+      VOLUME=BOXL*BOXL*BOXL
+      DNF=NRIGID*(3.0D0*NPRIM-NCONST)+3.0D0*NSOL*NATSOL-3.0D0
+      CONSTM=DNF*BOLTZK
+      GNKT=CONSTM*TEMP
+      GKT=BOLTZK*TEMP
+      TMAS(1)=GNKT*TAUP*TAUP
+      DO 1 I=2,MC
+        TMAS(I)=GKT*TAUP*TAUP
+   1  CONTINUE
+        W(1)=1.0D0/(4.0D0-4.0D0**(1.0D0/3.0D0))
+        W(2)=W(1)
+        W(3)=1.0D0-4.0D0*W(1)
+        W(4)=W(1)
+        W(5)=W(1)
+      DO 2 I=1,NYS
+        WDT2(I)=(W(I)*DT)/2.0D0/DFLOAT(NTC)
+        WDT4(I)=0.5D0*WDT2(I)
+        WDT8(I)=0.5D0*WDT4(I)
+   2  CONTINUE
+      DO 3 I=1,MC-1
+        GT(I+1)=(TMAS(I)*VETA(I)*VETA(I)-GKT)/TMAS(I+1)
+   3  CONTINUE
+      ICHECK=1
+      JCHECK=1
+      KCHECK=1
+      ETAVE=0.0D0
+      ETAVE2=0.0D0
+      EPAVE=0.0D0
+      EPAVE2=0.0D0
+      EKAVE=0.0D0
+      TAVE=0.0D0
+      TAVE2=0.0D0
+      PAVE=0.0D0
+      PAVE2=0.0D0
+      THKE0=0.0D0
+      THPEM=0.0D0
+      CHI=0.0D0
+      ISSE=0
+      NK=0
+      ICHUNK=0
+C
+C     Setup reciprocal space quantities
+C     
+      KMAX=10
+      CALL KSETUP(BOXLI,ALPHA,KMAX)
+C
+C     Call table look up for modulation factor and error function and
+C     its derivatives
+C     
+      CALL TABLE(BOXL,ALPHA)
+      RETURN
+      END
+
+      SUBROUTINE TABLE(BOXL,ALPHA)
+      IMPLICIT NONE
+      INTEGER I
+      DOUBLE PRECISION PI,FACT,BOXL,ALPHA,A2,RINCR,RINCRI
+      DOUBLE PRECISION RIJ,RIJ2,RIJ3,AERC,AXP,V
+      COMMON/VTABLE/V(4,500000),RINCR,RINCRI
+C
+C     Table look up function for error function and derivatives.
+C
+      PI=DACOS(-1.0D0)
+      FACT=2.0D0/DSQRT(PI)
+      A2=ALPHA*ALPHA
+      RINCR=BOXL/DFLOAT(500000)
+      RINCRI=1.0D0/RINCR
+      DO 2 I=1,500000
+        RIJ=RINCR*DFLOAT(I)
+        RIJ2=RIJ*RIJ
+        RIJ3=RIJ2*RIJ
+        AERC=DERFC(ALPHA*RIJ)
+        AXP=DEXP(-A2*RIJ2)
+        V(1,I)=AERC/RIJ
+        V(2,I)=-(FACT*AXP*ALPHA+V(1,I))/RIJ
+        V(3,I)=FACT*ALPHA*AXP*2.0D0*(1.0D0/RIJ2+A2)+2.0D0*V(1,I)/RIJ2
+        V(4,I)=-FACT*ALPHA*AXP*2.0D0*(3.0D0/RIJ3+(1.0D0/RIJ2+A2)*
+     $          (A2*RIJ))-6.0D0*AERC/(RIJ2*RIJ2)
+    2 CONTINUE
+      RETURN
+      END
+
+      SUBROUTINE ENEDER(X,Y,Z,FX,FY,FZ,POSF,FF,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $                  LOCAL_POSF,FF_SUM,ALPHA,SIGMA,PI,A2,A22I,BOXL,
+     $                  BOXLI,AMASS,AMASSF,FACT,FACT2,FACTOR,RLOWER,
+     $                  RUPPER,RL2,RU2,AS,BS,CS,RLOWS,RUPPS,RLS2,RUS2,
+     $                  ASS,BSS,CSS,ENERGY,VK,VIRK,KMAX,NATOM,NSITE,
+     $                  NSOL,NATSOL,NRIGID,NPRIM,NATOMS,NPERPR,NFP,
+     $                  RANK,NPERPF,DOUBLE_QUAD,DOUBLE_SOL,NPERPR_LOC,
+     $                  NPERPF_LOC,NFP_LOC,WATER_LOCAL,SOLUTE_LOCAL,
+     $                  DISP,SOL_DISP,PROCS)
+      IMPLICIT NONE
+      INTEGER I,J,K,IJK,NPERPR,NFP,RANK,NPERPF
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,NATOMS,KMAX,NBOND,IBOND
+      INTEGER JBOND,NANGLE,IANGLE,JANGLE,KANGLE,NDIHE,IDIHE
+      INTEGER JDIHE,KDIHE,LDIHE,NP,NIMP,IIMP,JIMP,KIMP,LIMP,NSOL
+      INTEGER NATSOL,NBON14,INBON14,JNBON14,NBON,INBON,JNBON
+      DOUBLE PRECISION X,Y,Z,FX,FY,FZ,POSF,FF,ALPHA,SIGMA,PI,A2,A22I
+      DOUBLE PRECISION BOXL,BOXLI,AMASS,AMASSF,FACT,FACT2,FACTOR
+      DOUBLE PRECISION RLOWER,RUPPER,RL2,RU2,AS,BS,CS,RLOWS,RUPPS,RLS2
+      DOUBLE PRECISION RUS2,ASS,BSS,CSS,CONST,ASPC,CSPC,RSPC,RSPC2,ESPC
+      DOUBLE PRECISION Q,QF,E0,EC,VK,VS,VEX,EINT,VIRLJCR,VIRK,VIRM,ETEST
+      DOUBLE PRECISION FTEST,STEP,EDIFF,XSUM,YSUM,ZSUM,MSUM,RXCM,RYCM
+      DOUBLE PRECISION RZCM,RXCMF,RYCMF,RZCMF,FCB,R0,FCA,A0,FCD,D0
+      DOUBLE PRECISION FCP,P0,RSOL,ESOL,RWSOL,EWSOL,SCVDW14,SCELE14
+      DOUBLE PRECISION VECK,V,RINCR,RINCRI,ENERGY,E0_S,EC_S,VIRLJCR_S
+      DOUBLE PRECISION LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_POSF,FF_S,FF_SUM
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION FX(NATOM,NSITE),FY(NATOM,NSITE),FZ(NATOM,NSITE)
+      DIMENSION POSF(NATOMS,3),FF(NATOMS,3)
+      DIMENSION AMASS(NATOM,3),AMASSF(NATOMS)
+      DIMENSION RXCM(NATOM),RYCM(NATOM),RZCM(NATOM)
+      DIMENSION RXCMF(NSOL),RYCMF(NSOL),RZCMF(NSOL)
+      dimension etest(3),ftest(3)
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE),LOCAL_POSF(NFP,3)
+      DIMENSION FF_S(NATOMS,3),FF_SUM(NATOMS,3),ENERGY(15)
+      COMMON/WATER/ASPC,CSPC,RSPC,RSPC2,ESPC,Q(1000,4)
+      COMMON/SOLUT/QF(1000)
+      COMMON/KVEC/VECK(10000)
+      COMMON/VTABLE/V(4,500000),RINCR,RINCRI
+      COMMON/BOND/FCB(2000),R0(2000),NBOND,IBOND(2000),JBOND(2000)
+      COMMON/ANGLE/FCA(2000),A0(2000),NANGLE,IANGLE(2000),
+     $             JANGLE(2000),KANGLE(2000)
+      COMMON/DIHE/FCD(2000),D0(2000),NDIHE,IDIHE(2000),JDIHE(2000),
+     $            KDIHE(2000),LDIHE(2000),NP(2000)
+      COMMON/IMPR/FCP(2000),P0(2000),NIMP,IIMP(2000),JIMP(2000),
+     $            KIMP(2000),LIMP(2000)
+      COMMON/FLEXI/RSOL(2000),ESOL(2000),RWSOL(2000),EWSOL(2000),
+     $             SCVDW14,SCELE14,NBON14,INBON14(2000),
+     $             JNBON14(2000),NBON,INBON(5000),JNBON(5000)
+
+      INCLUDE 'mpif.h'
+      INTEGER IERR
+      INTEGER DOUBLE_QUAD,DOUBLE_SOL,NPERPR_LOC,NPERPF_LOC
+      INTEGER NFP_LOC,WATER_LOCAL,SOLUTE_LOCAL,DISP,SOL_DISP,PROCS
+      DOUBLE PRECISION SCATTERBUF,SCATTERLOCAL
+      DOUBLE PRECISION SCATTERBUF_2,SCATTERLOCAL_2
+      DIMENSION SCATTERBUF(NSITE,3,NATOM),SCATTERLOCAL(NSITE,3,NPERPR)
+      DIMENSION SCATTERBUF_2(3,NATOMS),SCATTERLOCAL_2(3,NFP)
+      DIMENSION WATER_LOCAL(PROCS),SOLUTE_LOCAL(PROCS)
+      DIMENSION DISP(PROCS+1),SOL_DISP(PROCS+1)
+C
+C     Initialize nbonded list and forces.
+C
+c      step=0.00001d0
+c      do ijk=1,3    
+c        z(445,1)=z(445,1)+step
+c        write(6,*)'eneder z',z(445,1)
+c      e0=0.0D0
+c      ec=0.0D0
+c      eint=0.0D0
+c      vk=0.0D0
+      
+      CONST=418.4D0
+      DO 2 I=1,NPERPR_LOC
+        DO 1 J=1,NSITE
+          FX(I,J)=0.0D0
+          FY(I,J)=0.0D0
+          FZ(I,J)=0.0D0
+    1   CONTINUE
+    2 CONTINUE
+      DO 3 I=1,NFP_LOC
+        FF(I,1)=0.0D0
+        FF(I,2)=0.0D0
+        FF(I,3)=0.0D0
+    3 CONTINUE
+      DO 4 I=1,NATOMS
+        FF_S(I,1)=0.0D0
+        FF_S(I,2)=0.0D0
+        FF_S(I,3)=0.0D0
+    4 CONTINUE
+
+      CALL GATHER_D(X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z,SCATTERBUF,
+     $              SCATTERLOCAL,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $              NPERPR_LOC,NPERPR,NATOM,NSITE,PROCS)
+      CALL GATHER(POSF,LOCAL_POSF,SCATTERBUF_2,SCATTERLOCAL_2,
+     $            SOLUTE_LOCAL,SOL_DISP,DOUBLE_SOL,NFP_LOC,NFP,
+     $            NATOMS,3,PROCS)
+C
+C     Center of mass of the molecules.
+C
+      DO I=1,NRIGID
+        XSUM=0.0D0
+        YSUM=0.0D0
+        ZSUM=0.0D0
+        MSUM=0.0D0
+        DO J=1,NPRIM
+          XSUM=XSUM+AMASS(I,J)*X(I,J)
+          YSUM=YSUM+AMASS(I,J)*Y(I,J)
+          ZSUM=ZSUM+AMASS(I,J)*Z(I,J)
+          MSUM=MSUM+AMASS(I,J)
+        END DO
+        RXCM(I)=XSUM/MSUM
+        RYCM(I)=YSUM/MSUM
+        RZCM(I)=ZSUM/MSUM
+      END DO
+      DO I=1,NSOL
+        XSUM=0.0D0
+        YSUM=0.0D0
+        ZSUM=0.0D0
+        MSUM=0.0D0
+        DO J=1,NATSOL
+          K=(I-1)*NATSOL+J
+          XSUM=XSUM+AMASSF(K)*POSF(K,1)
+          YSUM=YSUM+AMASSF(K)*POSF(K,2)
+          ZSUM=ZSUM+AMASSF(K)*POSF(K,3)
+          MSUM=MSUM+AMASSF(K)
+        END DO
+        RXCMF(I)=XSUM/MSUM
+        RYCMF(I)=YSUM/MSUM
+        RZCMF(I)=ZSUM/MSUM
+      END DO
+C
+C     This is the nbonded energy and derivatives in real space
+C
+      CALL RWALD(X,Y,Z,FX,FY,FZ,POSF,FF,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $           LOCAL_POSF,FF_S,FF_SUM,RXCM,RYCM,RZCM,RXCMF,RYCMF,
+     $           RZCMF,BOXL,BOXLI,ALPHA,E0,EC,E0_S,EC_S,VIRLJCR,
+     $           VIRLJCR_S,RLOWER,RUPPER,RL2,RU2,AS,BS,CS,RLOWS,
+     $           RUPPS,RLS2,RUS2,ASS,BSS,CSS,PI,NATOM,NSITE,NRIGID,
+     $           NATOMS,NSOL,NATSOL,NPERPR,NFP,RANK,NPERPF,NPERPR_LOC,
+     $           NPERPF_LOC,NFP_LOC)
+C
+C     This is the nbonded energy and derivatives in reciprocal space
+C
+      CALL KWALD(X,Y,Z,FX,FY,FZ,POSF,FF,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $           LOCAL_POSF,RXCM,RYCM,RZCM,RXCMF,RYCMF,RZCMF,BOXL,
+     $           BOXLI,ALPHA,SIGMA,PI,A2,A22I,FACT,FACT2,FACTOR,VK,
+     $           VS,VEX,VIRK,VIRM,KMAX,NATOM,NSITE,NATOMS,NRIGID,
+     $           NSOL,NATSOL,NPERPR,NPERPF,NFP,NPERPR_LOC,NPERPF_LOC,
+     $           NFP_LOC,RANK)
+C
+C     Evaluate forces on primary atoms due to secondary atom
+C
+      CALL PRIMDER(LOCAL_X,LOCAL_Y,LOCAL_Z,FX,FY,FZ,BOXL,BOXLI,
+     $             NATOM,NSITE,NPRIM,NRIGID,NPERPR,NPERPR_LOC)
+C
+C     This is the internal energy for flexible molecules
+C     
+      CALL EINTERN(POSF,FF,LOCAL_POSF,BOXL,BOXLI,EINT,NATOMS,NSITE,NFP,
+     $             RANK)
+C
+C      WRITE(20,*)      
+C      WRITE(20,*)'DIRECT=',EC,'  ','RECIP=',VK
+C      WRITE(20,*)'LJ=',E0,'  ','EINT=',EINT
+C
+C     Get energy sum
+C
+      ENERGY(1)=E0
+      ENERGY(2)=EC
+      ENERGY(3)=E0_S
+      ENERGY(4)=EC_S
+      ENERGY(5)=VIRLJCR
+      ENERGY(6)=VIRLJCR_S
+      ENERGY(7)=VS
+      ENERGY(8)=VEX
+      ENERGY(9)=VIRM
+      ENERGY(10)=EINT
+           
+c      etest(ijk)=etot
+c      ftest(ijk)=fz(445,1)
+c      write(6,*)etest(ijk),ftest(ijk)
+c      end do
+c      ediff=0.5d0*(etest(3)-etest(1))/step
+c      write(6,*)ediff,-ftest(2)
+c      stop
+
+C
+C     Forces in units for verlet equation.
+C
+      DO 6 I=1,NPERPR_LOC
+        DO 5 J=1,NPRIM
+          FX(I,J)=FX(I,J)*CONST
+          FY(I,J)=FY(I,J)*CONST
+          FZ(I,J)=FZ(I,J)*CONST
+    5   CONTINUE
+    6 CONTINUE
+      DO 7 I=1,NFP_LOC
+          FF(I,1)=FF(I,1)*CONST
+          FF(I,2)=FF(I,2)*CONST
+          FF(I,3)=FF(I,3)*CONST
+    7 CONTINUE
+      RETURN
+      END
+
+      SUBROUTINE RATTLRR(LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_XCF,LOCAL_YCF,
+     $                   LOCAL_ZCF,LOCAL_VX,LOCAL_VY,LOCAL_VZ,FX,FY,FZ,
+     $                   LOCAL_POSF,LOCAL_POSCF,LOCAL_VELF,FF,AMASS,
+     $                   AMASSF,AMASSFI,FIXD,TSTEP,TOL,BOXL,BOXLI,
+     $                   DMASSI,NATOM,NSITE,NRIGID,NPRIM,NATOMS,ITER,
+     $                   ITER2,NSOL,NATSOL,NPERPR,NPERPF,NFP,NPERPR_LOC,
+     $                   NPERPF_LOC,NFP_LOC,RANK)
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,NATOMS,ITER,ITER2,NSOL
+      INTEGER NATSOL,N,I,J,NIT,IT
+      INTEGER NPERPR,NPERPF,NFP,NPERPR_LOC,NPERPF_LOC,NFP_LOC,RANK
+      DOUBLE PRECISION LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_XCF,LOCAL_YCF
+      DOUBLE PRECISION LOCAL_ZCF,LOCAL_VX,LOCAL_VY,LOCAL_VZ,FX,FY,FZ
+      DOUBLE PRECISION LOCAL_POSF,LOCAL_POSCF,LOCAL_VELF,FF,AMASSF
+      DOUBLE PRECISION AMASSFI,AMASS,FIXD,TSTEP,TOL,BOXL,BOXLI
+      DOUBLE PRECISION SHAKE,SKINV,RM,TSTEP2,TSTEPI2,D12SQ
+      DOUBLE PRECISION D13SQ,D23SQ,SX1,SY1,SZ1,SX2,SY2,SZ2
+      DOUBLE PRECISION SX3,SY3,SZ3,RX12,RY12,RZ12,RX13,RY13
+      DOUBLE PRECISION RZ13,RX23,RY23,RZ23,SX12,SY12,SZ12
+      DOUBLE PRECISION SX13,SY13,SZ13,SX23,SY23,SZ23,S12SQ
+      DOUBLE PRECISION S13SQ,S23SQ,CPRM12,CPRM13,CPRM23
+      DOUBLE PRECISION R12S12,R13S12,R23S12,R12S13,R13S13
+      DOUBLE PRECISION R23S13,R12S23,R13S23,R23S23,CM11,CM21
+      DOUBLE PRECISION CM31,GR12,GR13,GR23,XPBC,YPBC,ZPBC
+      DOUBLE PRECISION XJK21,YJK21,ZJK21,XJK31,YJK31,ZJK31
+      DOUBLE PRECISION XB,YB,ZB,RB,DMASSI
+      DOUBLE PRECISION XFSUM,YFSUM,ZFSUM,MFSUM,RXCMF,RYCMF,RZCMF
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION LOCAL_XCF(NPERPR,3),LOCAL_YCF(NPERPR,3)
+      DIMENSION LOCAL_ZCF(NPERPR,3)
+      DIMENSION LOCAL_VX(NPERPR,3),LOCAL_VY(NPERPR,3)
+      DIMENSION LOCAL_VZ(NPERPR,3)
+      DIMENSION FX(NATOM,NSITE),FY(NATOM,NSITE),FZ(NATOM,NSITE)
+      DIMENSION LOCAL_POSF(NFP,3),LOCAL_POSCF(NFP,3),LOCAL_VELF(NFP,3)
+      DIMENSION FF(NATOMS,3),AMASS(NATOM,3),FIXD(3,3)
+      DIMENSION AMASSF(NATOMS),AMASSFI(NATOMS)
+      DIMENSION SHAKE(3,3),SKINV(3,3)
+      DIMENSION DMASSI(3)
+      PARAMETER (RM=0.12500)
+C
+C     This is the RATTLE algorithm as originally discussed by H.C. Andersen
+C     in J. Comp. Phys., V.52, 1983, 24-34. This routine solves the position
+C     Lagrange multipliers.
+C
+      TSTEP2=0.5D0*TSTEP
+      TSTEPI2=1.0D0/2.0D0/TSTEP/TSTEP
+      D12SQ=FIXD(1,2)*FIXD(1,2)
+      D13SQ=FIXD(1,3)*FIXD(1,3)
+      D23SQ=FIXD(2,3)*FIXD(2,3)
+      DO 6 N=1,NPERPR_LOC
+        DO J=1,NPRIM
+        LOCAL_VX(N,J)=LOCAL_VX(N,J)+TSTEP2*DMASSI(J)*FX(N,J)
+        LOCAL_VY(N,J)=LOCAL_VY(N,J)+TSTEP2*DMASSI(J)*FY(N,J)
+        LOCAL_VZ(N,J)=LOCAL_VZ(N,J)+TSTEP2*DMASSI(J)*FZ(N,J)
+        END DO
+C
+C      Velocity Verlet algorithm
+C
+          SX1=LOCAL_X(N,1)+TSTEP*LOCAL_VX(N,1)
+          SY1=LOCAL_Y(N,1)+TSTEP*LOCAL_VY(N,1)
+          SZ1=LOCAL_Z(N,1)+TSTEP*LOCAL_VZ(N,1)
+          SX2=LOCAL_X(N,2)+TSTEP*LOCAL_VX(N,2)
+          SY2=LOCAL_Y(N,2)+TSTEP*LOCAL_VY(N,2)
+          SZ2=LOCAL_Z(N,2)+TSTEP*LOCAL_VZ(N,2)
+          SX3=LOCAL_X(N,3)+TSTEP*LOCAL_VX(N,3)
+          SY3=LOCAL_Y(N,3)+TSTEP*LOCAL_VY(N,3)
+          SZ3=LOCAL_Z(N,3)+TSTEP*LOCAL_VZ(N,3)
+C
+C     Calculate relative vectors
+C
+          RX12=LOCAL_X(N,1)-LOCAL_X(N,2)
+          RY12=LOCAL_Y(N,1)-LOCAL_Y(N,2)
+          RZ12=LOCAL_Z(N,1)-LOCAL_Z(N,2)
+          RX12=RX12-BOXL*DNINT(RX12*BOXLI)
+          RY12=RY12-BOXL*DNINT(RY12*BOXLI)
+          RZ12=RZ12-BOXL*DNINT(RZ12*BOXLI)
+          RX13=LOCAL_X(N,1)-LOCAL_X(N,3)
+          RY13=LOCAL_Y(N,1)-LOCAL_Y(N,3)
+          RZ13=LOCAL_Z(N,1)-LOCAL_Z(N,3)
+          RX13=RX13-BOXL*DNINT(RX13*BOXLI)
+          RY13=RY13-BOXL*DNINT(RY13*BOXLI)
+          RZ13=RZ13-BOXL*DNINT(RZ13*BOXLI)
+          RX23=LOCAL_X(N,2)-LOCAL_X(N,3)
+          RY23=LOCAL_Y(N,2)-LOCAL_Y(N,3)
+          RZ23=LOCAL_Z(N,2)-LOCAL_Z(N,3)
+          RX23=RX23-BOXL*DNINT(RX23*BOXLI)
+          RY23=RY23-BOXL*DNINT(RY23*BOXLI)
+          RZ23=RZ23-BOXL*DNINT(RZ23*BOXLI)
+C
+C     Iterative loop begins
+C
+        NIT=0
+        DO 4 IT=1,ITER2
+C
+C     Calculate relative vectors
+C
+          SX12=SX1-SX2
+          SY12=SY1-SY2
+          SZ12=SZ1-SZ2
+          SX12=SX12-BOXL*DNINT(SX12*BOXLI)
+          SY12=SY12-BOXL*DNINT(SY12*BOXLI)
+          SZ12=SZ12-BOXL*DNINT(SZ12*BOXLI)
+          SX13=SX1-SX3
+          SY13=SY1-SY3
+          SZ13=SZ1-SZ3
+          SX13=SX13-BOXL*DNINT(SX13*BOXLI)
+          SY13=SY13-BOXL*DNINT(SY13*BOXLI)
+          SZ13=SZ13-BOXL*DNINT(SZ13*BOXLI)
+          SX23=SX2-SX3
+          SY23=SY2-SY3
+          SZ23=SZ2-SZ3
+          SX23=SX23-BOXL*DNINT(SX23*BOXLI)
+          SY23=SY23-BOXL*DNINT(SY23*BOXLI)
+          SZ23=SZ23-BOXL*DNINT(SZ23*BOXLI)
+          S12SQ=SX12*SX12+SY12*SY12+SZ12*SZ12
+          S13SQ=SX13*SX13+SY13*SY13+SZ13*SZ13
+          S23SQ=SX23*SX23+SY23*SY23+SZ23*SZ23
+          CPRM12=DABS(S12SQ-D12SQ)/(2.0D0*D12SQ)
+          CPRM13=DABS(S13SQ-D13SQ)/(2.0D0*D13SQ)
+          CPRM23=DABS(S23SQ-D23SQ)/(2.0D0*D23SQ)
+          IF((CPRM12.LE.TOL).AND.(CPRM13.LE.TOL).AND.
+     $       (CPRM23.LE.TOL))GO TO 5       
+C
+C     Calculate scalar products
+C          
+          R12S12=RX12*SX12+RY12*SY12+RZ12*SZ12
+          R13S12=RX13*SX12+RY13*SY12+RZ13*SZ12
+          R23S12=RX23*SX12+RY23*SY12+RZ23*SZ12
+          R12S13=RX12*SX13+RY12*SY13+RZ12*SZ13   
+          R13S13=RX13*SX13+RY13*SY13+RZ13*SZ13
+          R23S13=RX23*SX13+RY23*SY13+RZ23*SZ13
+          R12S23=RX12*SX23+RY12*SY23+RZ12*SZ23   
+          R13S23=RX13*SX23+RY13*SY23+RZ13*SZ23
+          R23S23=RX23*SX23+RY23*SY23+RZ23*SZ23
+C
+C     Calculate matrix elements
+C
+          SHAKE(1,1) =  R12S12*(DMASSI(1)+DMASSI(2))
+          SHAKE(1,2) =  R13S12*DMASSI(1)
+          SHAKE(1,3) = -R23S12*DMASSI(2)
+          SHAKE(2,1) =  R12S13*DMASSI(1)
+          SHAKE(2,2) =  R13S13*(DMASSI(1)+DMASSI(3))
+          SHAKE(2,3) =  R23S13*DMASSI(3)
+          SHAKE(3,1) = -R12S23*DMASSI(2)
+          SHAKE(3,2) =  R13S23*DMASSI(3)
+          SHAKE(3,3) =  R23S23*(DMASSI(2)+DMASSI(3))
+          CM11=TSTEPI2*(S12SQ-D12SQ)
+          CM21=TSTEPI2*(S13SQ-D13SQ)
+          CM31=TSTEPI2*(S23SQ-D23SQ)
+C
+C     Now call the routine to invert the matrix SHAKE
+C
+          CALL SHMAT(SHAKE,SKINV)
+C
+C     Obtain solutions of linearized equation
+C
+          GR12=SKINV(1,1)*CM11+SKINV(1,2)*CM21+SKINV(1,3)*CM31
+          GR13=SKINV(2,1)*CM11+SKINV(2,2)*CM21+SKINV(2,3)*CM31
+          GR23=SKINV(3,1)*CM11+SKINV(3,2)*CM21+SKINV(3,3)*CM31
+C
+C     Obtain the coordinates
+C
+      LOCAL_VX(N,1)=LOCAL_VX(N,1)-TSTEP*DMASSI(1)*(GR12*RX12+GR13*RX13)
+      LOCAL_VY(N,1)=LOCAL_VY(N,1)-TSTEP*DMASSI(1)*(GR12*RY12+GR13*RY13)
+      LOCAL_VZ(N,1)=LOCAL_VZ(N,1)-TSTEP*DMASSI(1)*(GR12*RZ12+GR13*RZ13)
+      LOCAL_VX(N,2)=LOCAL_VX(N,2)-TSTEP*DMASSI(2)*(-GR12*RX12+GR23*RX23)
+      LOCAL_VY(N,2)=LOCAL_VY(N,2)-TSTEP*DMASSI(2)*(-GR12*RY12+GR23*RY23)
+      LOCAL_VZ(N,2)=LOCAL_VZ(N,2)-TSTEP*DMASSI(2)*(-GR12*RZ12+GR23*RZ23)
+      LOCAL_VX(N,3)=LOCAL_VX(N,3)-TSTEP*DMASSI(3)*(-GR13*RX13-GR23*RX23)
+      LOCAL_VY(N,3)=LOCAL_VY(N,3)-TSTEP*DMASSI(3)*(-GR13*RY13-GR23*RY23)
+      LOCAL_VZ(N,3)=LOCAL_VZ(N,3)-TSTEP*DMASSI(3)*(-GR13*RZ13-GR23*RZ23)
+      SX1=LOCAL_X(N,1)+TSTEP*LOCAL_VX(N,1)
+      SY1=LOCAL_Y(N,1)+TSTEP*LOCAL_VY(N,1)
+      SZ1=LOCAL_Z(N,1)+TSTEP*LOCAL_VZ(N,1)
+      SX2=LOCAL_X(N,2)+TSTEP*LOCAL_VX(N,2)          
+      SY2=LOCAL_Y(N,2)+TSTEP*LOCAL_VY(N,2)          
+      SZ2=LOCAL_Z(N,2)+TSTEP*LOCAL_VZ(N,2)
+      SX3=LOCAL_X(N,3)+TSTEP*LOCAL_VX(N,3)
+      SY3=LOCAL_Y(N,3)+TSTEP*LOCAL_VY(N,3)
+      SZ3=LOCAL_Z(N,3)+TSTEP*LOCAL_VZ(N,3)
+          NIT=NIT+1          
+    4   CONTINUE
+       WRITE(6,*)'Position RATTLE did not converge in',ITER2,'iterations 
+     $for molecule',N
+        STOP
+    5   CONTINUE
+        IF(ITER.EQ.1000000)WRITE(48,*)NIT
+C
+C     Update position vectors of primary atoms
+C
+       DO J=1,NPRIM
+         LOCAL_X(N,J)=LOCAL_X(N,J)+TSTEP*LOCAL_VX(N,J)
+         LOCAL_Y(N,J)=LOCAL_Y(N,J)+TSTEP*LOCAL_VY(N,J)
+         LOCAL_Z(N,J)=LOCAL_Z(N,J)+TSTEP*LOCAL_VZ(N,J)
+         LOCAL_XCF(N,J)=LOCAL_XCF(N,J)+TSTEP*LOCAL_VX(N,J)
+         LOCAL_YCF(N,J)=LOCAL_YCF(N,J)+TSTEP*LOCAL_VY(N,J)
+         LOCAL_ZCF(N,J)=LOCAL_ZCF(N,J)+TSTEP*LOCAL_VZ(N,J)
+       END DO
+C
+C     Apply the PBC to the coordinates.
+C
+          XPBC=BOXL*DNINT(LOCAL_X(N,1)*BOXLI)
+          YPBC=BOXL*DNINT(LOCAL_Y(N,1)*BOXLI)
+          ZPBC=BOXL*DNINT(LOCAL_Z(N,1)*BOXLI)
+        DO J=1,NPRIM
+          LOCAL_X(N,J)=LOCAL_X(N,J)-XPBC
+          LOCAL_Y(N,J)=LOCAL_Y(N,J)-YPBC
+          LOCAL_Z(N,J)=LOCAL_Z(N,J)-ZPBC
+        END DO
+C
+C     Update position vectors of secondary atom
+C
+         XJK21=LOCAL_X(N,2)-LOCAL_X(N,1)
+         YJK21=LOCAL_Y(N,2)-LOCAL_Y(N,1)
+         ZJK21=LOCAL_Z(N,2)-LOCAL_Z(N,1)
+         XJK31=LOCAL_X(N,3)-LOCAL_X(N,1)
+         YJK31=LOCAL_Y(N,3)-LOCAL_Y(N,1)
+         ZJK31=LOCAL_Z(N,3)-LOCAL_Z(N,1)
+         XB=0.5D0*(XJK21+XJK31)
+         YB=0.5D0*(YJK21+YJK31)
+         ZB=0.5D0*(ZJK21+ZJK31)
+         RB=DSQRT(XB*XB+YB*YB+ZB*ZB)
+         LOCAL_X(N,4)=LOCAL_X(N,1)+RM*XB/RB
+         LOCAL_Y(N,4)=LOCAL_Y(N,1)+RM*YB/RB
+         LOCAL_Z(N,4)=LOCAL_Z(N,1)+RM*ZB/RB    
+   6   CONTINUE
+
+        DO 9 N=1,NPERPF_LOC
+          XFSUM=0.0D0
+          YFSUM=0.0D0
+          ZFSUM=0.0D0
+          MFSUM=0.0D0
+          DO 7 J=1,NATSOL
+            I=(N-1)*NATSOL+J     
+            LOCAL_VELF(I,1)=LOCAL_VELF(I,1)+TSTEP2*AMASSFI(I)*FF(I,1)
+            LOCAL_VELF(I,2)=LOCAL_VELF(I,2)+TSTEP2*AMASSFI(I)*FF(I,2)
+            LOCAL_VELF(I,3)=LOCAL_VELF(I,3)+TSTEP2*AMASSFI(I)*FF(I,3)
+            LOCAL_POSF(I,1)=LOCAL_POSF(I,1)+TSTEP*LOCAL_VELF(I,1)
+            LOCAL_POSF(I,2)=LOCAL_POSF(I,2)+TSTEP*LOCAL_VELF(I,2)
+            LOCAL_POSF(I,3)=LOCAL_POSF(I,3)+TSTEP*LOCAL_VELF(I,3)
+            LOCAL_POSCF(I,1)=LOCAL_POSCF(I,1)+TSTEP*LOCAL_VELF(I,1)
+            LOCAL_POSCF(I,2)=LOCAL_POSCF(I,2)+TSTEP*LOCAL_VELF(I,2)
+            LOCAL_POSCF(I,3)=LOCAL_POSCF(I,3)+TSTEP*LOCAL_VELF(I,3)
+            XFSUM=XFSUM+AMASSF(I)*LOCAL_POSF(I,1)
+            YFSUM=YFSUM+AMASSF(I)*LOCAL_POSF(I,2)
+            ZFSUM=ZFSUM+AMASSF(I)*LOCAL_POSF(I,3)
+            MFSUM=MFSUM+AMASSF(I)
+   7      CONTINUE
+          RXCMF=XFSUM/MFSUM
+          RYCMF=YFSUM/MFSUM
+          RZCMF=ZFSUM/MFSUM
+C
+C     Apply the PBC to the coordinates.
+C
+          XPBC=BOXL*DNINT(RXCMF*BOXLI)
+          YPBC=BOXL*DNINT(RYCMF*BOXLI)
+          ZPBC=BOXL*DNINT(RZCMF*BOXLI)
+          DO 8 J=1,NATSOL
+            I=(N-1)*NATSOL+J
+            LOCAL_POSF(I,1)=LOCAL_POSF(I,1)-XPBC
+            LOCAL_POSF(I,2)=LOCAL_POSF(I,2)-YPBC
+            LOCAL_POSF(I,3)=LOCAL_POSF(I,3)-ZPBC
+   8      CONTINUE
+   9    CONTINUE  
+      RETURN
+      END
+
+      SUBROUTINE RATTLVV(LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_VX,LOCAL_VY,
+     $                   LOCAL_VZ,FX,FY,FZ,LOCAL_VELF,FF,AMASS,
+     $                   AMASSFI,FIXD,TSTEP,BOXL,BOXLI,DMASSI,NATOM,
+     $                   NSITE,NRIGID,NPRIM,NATOMS,NSOL,NATSOL,ITER,
+     $                   NPERPR,NPERPF,NFP,NPERPR_LOC,NPERPF_LOC,
+     $                   NFP_LOC,RANK)
+      IMPLICIT NONE
+      INTEGER N,I,J
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,NATOMS,NSOL,NATSOL,ITER
+      INTEGER NPERPR,NPERPF,NFP,NPERPR_LOC,NPERPF_LOC,NFP_LOC,RANK
+      DOUBLE PRECISION LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_VX,LOCAL_VY
+      DOUBLE PRECISION LOCAL_VZ,FX,FY,FZ,AMASS,AMASSFI,FIXD,LOCAL_VELF
+      DOUBLE PRECISION FF,TSTEP,BOXL,BOXLI,RATTL,RTINV,TSTEP2
+      DOUBLE PRECISION DMASSI,RX12,RY12,RZ12,RX13,RY13,RZ13,RX23
+      DOUBLE PRECISION RY23,RZ23,VX12,VY12,VZ12,VX13,VY13,VZ13,VX23
+      DOUBLE PRECISION VY23,VZ23,QR11,QR21,QR31,R12R12,R23R23,R13R13
+      DOUBLE PRECISION R12R13,R12R23,R13R23,GV12,GV13,GV23
+      DOUBLE PRECISION XX12,YY12,ZZ12,XV12,YV12,ZV12,RVDOT
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION LOCAL_VX(NPERPR,3),LOCAL_VY(NPERPR,3)
+      DIMENSION LOCAL_VZ(NPERPR,3)
+      DIMENSION FX(NATOM,NSITE),FY(NATOM,NSITE),FZ(NATOM,NSITE)
+      DIMENSION LOCAL_VELF(NFP,3),FF(NATOMS,3)
+      DIMENSION AMASS(NATOM,3),FIXD(3,3),AMASSFI(NATOMS)
+      DIMENSION RATTL(3,3),RTINV(3,3)
+      DIMENSION DMASSI(3)
+C
+C     This is the RATTLE algorithm as originally discussed by H.C. Andersen
+C     in J. Comp. Phys., V.52, 1983, 24-34. This routine solves the velocity
+C     Lagrange multipliers.
+C
+      TSTEP2=0.5D0*TSTEP
+      DO 5 N=1,NPERPR_LOC 
+        DO J=1,NPRIM
+          LOCAL_VX(N,J)=LOCAL_VX(N,J)+TSTEP2*DMASSI(J)*FX(N,J)
+          LOCAL_VY(N,J)=LOCAL_VY(N,J)+TSTEP2*DMASSI(J)*FY(N,J)
+          LOCAL_VZ(N,J)=LOCAL_VZ(N,J)+TSTEP2*DMASSI(J)*FZ(N,J)
+        END DO
+        RX12=LOCAL_X(N,1)-LOCAL_X(N,2)
+        RY12=LOCAL_Y(N,1)-LOCAL_Y(N,2)
+        RZ12=LOCAL_Z(N,1)-LOCAL_Z(N,2)
+        RX12=RX12-BOXL*DNINT(RX12*BOXLI)
+        RY12=RY12-BOXL*DNINT(RY12*BOXLI)
+        RZ12=RZ12-BOXL*DNINT(RZ12*BOXLI)
+        RX13=LOCAL_X(N,1)-LOCAL_X(N,3)
+        RY13=LOCAL_Y(N,1)-LOCAL_Y(N,3)
+        RZ13=LOCAL_Z(N,1)-LOCAL_Z(N,3)
+        RX13=RX13-BOXL*DNINT(RX13*BOXLI)
+        RY13=RY13-BOXL*DNINT(RY13*BOXLI)
+        RZ13=RZ13-BOXL*DNINT(RZ13*BOXLI)
+        RX23=LOCAL_X(N,2)-LOCAL_X(N,3)
+        RY23=LOCAL_Y(N,2)-LOCAL_Y(N,3)
+        RZ23=LOCAL_Z(N,2)-LOCAL_Z(N,3)
+        RX23=RX23-BOXL*DNINT(RX23*BOXLI)
+        RY23=RY23-BOXL*DNINT(RY23*BOXLI)
+        RZ23=RZ23-BOXL*DNINT(RZ23*BOXLI)
+        VX12=LOCAL_VX(N,1)-LOCAL_VX(N,2)
+        VY12=LOCAL_VY(N,1)-LOCAL_VY(N,2)
+        VZ12=LOCAL_VZ(N,1)-LOCAL_VZ(N,2)
+        VX13=LOCAL_VX(N,1)-LOCAL_VX(N,3)
+        VY13=LOCAL_VY(N,1)-LOCAL_VY(N,3)
+        VZ13=LOCAL_VZ(N,1)-LOCAL_VZ(N,3)
+        VX23=LOCAL_VX(N,2)-LOCAL_VX(N,3)
+        VY23=LOCAL_VY(N,2)-LOCAL_VY(N,3)
+        VZ23=LOCAL_VZ(N,2)-LOCAL_VZ(N,3)
+        QR11 = -(VX12*RX12+VY12*RY12+VZ12*RZ12)
+        QR21 = -(VX13*RX13+VY13*RY13+VZ13*RZ13)
+        QR31 = -(VX23*RX23+VY23*RY23+VZ23*RZ23)
+C
+C    Calculate the matrix elements for the RATTLE 
+C
+       R12R12=RX12*RX12+RY12*RY12+RZ12*RZ12
+       R23R23=RX23*RX23+RY23*RY23+RZ23*RZ23
+       R13R13=RX13*RX13+RY13*RY13+RZ13*RZ13
+       R12R13=RX12*RX13+RY12*RY13+RZ12*RZ13
+       R12R23=RX12*RX23+RY12*RY23+RZ12*RZ23
+       R13R23=RX13*RX23+RY13*RY23+RZ13*RZ23
+       RATTL(1,1) =  R12R12*(DMASSI(1)+DMASSI(2))
+       RATTL(1,2) =  R12R13*DMASSI(1)
+       RATTL(1,3) = -R12R23*DMASSI(2)
+       RATTL(2,1) =  RATTL(1,2)
+       RATTL(2,2) =  R13R13*(DMASSI(1)+DMASSI(3))
+       RATTL(2,3) =  R13R23*DMASSI(3)
+       RATTL(3,1) =  RATTL(1,3)
+       RATTL(3,2) =  RATTL(2,3)
+       RATTL(3,3) =  R23R23*(DMASSI(3)+DMASSI(2))
+C
+C    Call the routine to invert the matrix RATTLE
+C
+       CALL RTMAT(RATTL,RTINV)
+C
+C     Obtain the velocity Lagrange multipliers
+C
+        GV12=RTINV(1,1)*QR11+RTINV(1,2)*QR21+RTINV(1,3)*QR31
+        GV13=RTINV(2,1)*QR11+RTINV(2,2)*QR21+RTINV(2,3)*QR31
+        GV23=RTINV(3,1)*QR11+RTINV(3,2)*QR21+RTINV(3,3)*QR31
+C
+C     Evaluate the constraint velocity
+C
+        LOCAL_VX(N,1)=LOCAL_VX(N,1)+DMASSI(1)*(GV12*RX12+GV13*RX13)
+        LOCAL_VY(N,1)=LOCAL_VY(N,1)+DMASSI(1)*(GV12*RY12+GV13*RY13)
+        LOCAL_VZ(N,1)=LOCAL_VZ(N,1)+DMASSI(1)*(GV12*RZ12+GV13*RZ13)
+        LOCAL_VX(N,2)=LOCAL_VX(N,2)+DMASSI(2)*(-GV12*RX12+GV23*RX23)
+        LOCAL_VY(N,2)=LOCAL_VY(N,2)+DMASSI(2)*(-GV12*RY12+GV23*RY23)
+        LOCAL_VZ(N,2)=LOCAL_VZ(N,2)+DMASSI(2)*(-GV12*RZ12+GV23*RZ23)
+        LOCAL_VX(N,3)=LOCAL_VX(N,3)+DMASSI(3)*(-GV13*RX13-GV23*RX23)
+        LOCAL_VY(N,3)=LOCAL_VY(N,3)+DMASSI(3)*(-GV13*RY13-GV23*RY23)
+        LOCAL_VZ(N,3)=LOCAL_VZ(N,3)+DMASSI(3)*(-GV13*RZ13-GV23*RZ23)
+    5 CONTINUE
+      if(mod(iter,1000000).eq.0)then
+      xx12=LOCAL_x(10,1)-LOCAL_x(10,2)
+      yy12=LOCAL_y(10,1)-LOCAL_y(10,2)
+      zz12=LOCAL_z(10,1)-LOCAL_z(10,2)
+      xx12=xx12-boxl*dnint(xx12*boxli)
+      yy12=yy12-boxl*dnint(yy12*boxli)
+      zz12=zz12-boxl*dnint(zz12*boxli) 
+      xv12=LOCAL_vx(10,1)-LOCAL_vx(10,2)
+      yv12=LOCAL_vy(10,1)-LOCAL_vy(10,2)
+      zv12=LOCAL_vz(10,1)-LOCAL_vz(10,2)
+      rvdot=xx12*xv12+yy12*yv12+zz12*zv12
+      IF(RANK.EQ.0)THEN
+      write(49,*)rvdot
+      END IF
+      end if
+C
+C     Velocity of flexible solute at full-time step.
+C
+      DO 7 N=1,NPERPF_LOC
+        DO 6 J=1,NATSOL
+          I=(N-1)*NATSOL+J
+          LOCAL_VELF(I,1)=LOCAL_VELF(I,1)+TSTEP2*AMASSFI(I)*FF(I,1)
+          LOCAL_VELF(I,2)=LOCAL_VELF(I,2)+TSTEP2*AMASSFI(I)*FF(I,2)
+          LOCAL_VELF(I,3)=LOCAL_VELF(I,3)+TSTEP2*AMASSFI(I)*FF(I,3)
+   6    CONTINUE
+   7  CONTINUE
+      RETURN
+      END
+
+      SUBROUTINE NHCINT(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS,
+     $                  AMASSF,AKIN_SUM,TMAS,ETA,VETA,GT,WDT2,WDT4,
+     $                  WDT8,GNKT,GKT,NTC,NYS,MC,NATOM,NSITE,NRIGID,
+     $                  NPRIM,NATOMS,NPERPR,NFP,NPERPR_LOC,NFP_LOC)
+      IMPLICIT NONE
+      INTEGER NTC,NYS,MC,NATOM,NSITE,NRIGID,NPRIM,INC,JYS
+      INTEGER I,J,NATOMS,NPERPR,NFP,NPERPR_LOC,NFP_LOC
+      DOUBLE PRECISION AMASS,AMASSF,TMAS,ETA,VETA,GT
+      DOUBLE PRECISION WDT2,WDT4,WDT8,GNKT,GKT,AKIN_SUM,SCALET,SC
+      DOUBLE PRECISION LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF
+      DIMENSION AMASS(NATOM,3),AMASSF(NATOMS)
+      DIMENSION LOCAL_VX(NPERPR,3),LOCAL_VY(NPERPR,3)
+      DIMENSION LOCAL_VZ(NPERPR,3),LOCAL_VELF(NFP,3)
+      DIMENSION WDT2(5),WDT4(5),WDT8(5)
+      DIMENSION ETA(5),VETA(5),GT(5),TMAS(5)
+      
+
+      SCALET=1.0D0
+      GT(1)=(AKIN_SUM-GNKT)/TMAS(1)
+      DO 6 INC=1,NTC
+        DO 5 JYS=1,NYS
+          VETA(MC)=VETA(MC)+WDT4(JYS)*GT(MC)
+          DO 2 I=1,MC-1
+            SC=DEXP(-WDT8(JYS)*VETA(MC-I+1))
+            VETA(MC-I)=VETA(MC-I)*SC*SC+WDT4(JYS)*GT(MC-I)*SC
+   2      CONTINUE
+            SC=DEXP(-WDT2(JYS)*VETA(1))
+            SCALET=SCALET*SC
+            GT(1)=(SCALET*SCALET*AKIN_SUM-GNKT)/TMAS(1)
+          DO 3 I=1,MC
+            ETA(I)=ETA(I)+WDT2(JYS)*VETA(I)
+   3      CONTINUE
+          DO 4 I=1,MC-1
+            SC=DEXP(-WDT8(JYS)*VETA(I+1))
+            VETA(I)=VETA(I)*SC*SC+WDT4(JYS)*GT(I)*SC
+            GT(I+1)=(TMAS(I)*VETA(I)*VETA(I)-GKT)/TMAS(I+1)
+   4      CONTINUE
+            VETA(MC)=VETA(MC)+WDT4(JYS)*GT(MC)
+   5    CONTINUE
+   6  CONTINUE
+      DO 8 I=1,NPERPR_LOC
+        DO 7 J=1,NPRIM
+            LOCAL_VX(I,J)=LOCAL_VX(I,J)*SCALET
+            LOCAL_VY(I,J)=LOCAL_VY(I,J)*SCALET
+            LOCAL_VZ(I,J)=LOCAL_VZ(I,J)*SCALET
+   7    CONTINUE
+   8  CONTINUE
+      DO 9 I=1,NFP_LOC
+        LOCAL_VELF(I,1)=LOCAL_VELF(I,1)*SCALET
+        LOCAL_VELF(I,2)=LOCAL_VELF(I,2)*SCALET
+        LOCAL_VELF(I,3)=LOCAL_VELF(I,3)*SCALET
+   9  CONTINUE    
+      RETURN
+      END 
+ 
+      SUBROUTINE MXWELL(VX,VY,VZ,VELF,AMASS,AMASSF,TEMPF,NATOM,
+     $                  NSITE,NRIGID,NPRIM,NATOMS,ISEED)
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,NATOMS,ISEED,I,J
+      DOUBLE PRECISION VX,VY,VZ,VELF,AMASS,AMASSF,TEMPF,BOLTZK,SIGMA
+      DOUBLE PRECISION RN,SUMX,SUMY,SUMZ,AMSUM
+      DIMENSION VX(NATOM,3),VY(NATOM,3),VZ(NATOM,3)
+      DIMENSION VELF(NATOMS,3),AMASS(NATOM,3),AMASSF(NATOMS)
+      PARAMETER (BOLTZK=0.83144703385D0)
+
+      DO 2 I=1,NRIGID
+        DO 1 J=1,NPRIM
+          SIGMA=DSQRT((BOLTZK*TEMPF)/AMASS(I,J))
+          CALL GAUSSV(ISEED,RN)
+          VX(I,J)=SIGMA*RN
+          CALL GAUSSV(ISEED,RN)       
+          VY(I,J)=SIGMA*RN
+          CALL GAUSSV(ISEED,RN)
+          VZ(I,J)=SIGMA*RN       
+    1   CONTINUE
+    2 CONTINUE
+      DO 3 I=1,NATOMS
+        SIGMA=DSQRT((BOLTZK*TEMPF)/AMASSF(I))
+        CALL GAUSSV(ISEED,RN)
+        VELF(I,1)=SIGMA*RN
+        CALL GAUSSV(ISEED,RN)       
+        VELF(I,2)=SIGMA*RN
+        CALL GAUSSV(ISEED,RN)
+        VELF(I,3)=SIGMA*RN     
+    3 CONTINUE
+C
+C     Make the center of mass a fixed point
+C 
+       SUMX=0.0D0
+       SUMY=0.0D0
+       SUMZ=0.0D0
+       AMSUM=0.0D0
+       DO I=1,NRIGID
+         DO J=1,NPRIM
+           SUMX=SUMX+AMASS(I,J)*VX(I,J)
+           SUMY=SUMY+AMASS(I,J)*VY(I,J)
+           SUMZ=SUMZ+AMASS(I,J)*VZ(I,J)
+           AMSUM=AMSUM+AMASS(I,J)
+         END DO
+       END DO
+       DO I=1,NATOMS
+         SUMX=SUMX+AMASSF(I)*VELF(I,1)
+         SUMY=SUMY+AMASSF(I)*VELF(I,2)
+         SUMZ=SUMZ+AMASSF(I)*VELF(I,3)
+         AMSUM=AMSUM+AMASSF(I)
+       END DO
+         SUMX=SUMX/AMSUM
+         SUMY=SUMY/AMSUM
+         SUMZ=SUMZ/AMSUM
+      DO I=1,NRIGID
+        DO J=1,NPRIM
+         VX(I,J)=VX(I,J)-SUMX
+         VY(I,J)=VY(I,J)-SUMY
+         VZ(I,J)=VZ(I,J)-SUMZ
+        END DO
+      END DO
+      DO I=1,NATOMS
+        VELF(I,1)=VELF(I,1)-SUMX
+        VELF(I,2)=VELF(I,2)-SUMY
+        VELF(I,3)=VELF(I,3)-SUMZ
+      END DO
+      RETURN
+      END
+
+      SUBROUTINE VELSTTR(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_X,LOCAL_Y,
+     $                   LOCAL_Z,AMASS,FIXD,BOXL,BOXLI,DMASSI,NATOM,
+     $                   NSITE,NRIGID,NPRIM,NPERPR,NPERPR_LOC)
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,N,J,NPERPR,NPERPR_LOC
+      DOUBLE PRECISION LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_X,LOCAL_Y
+      DOUBLE PRECISION LOCAL_Z,AMASS
+      DOUBLE PRECISION FIXD,BOXL,BOXLI,DMASSI
+      DOUBLE PRECISION RX12,RY12,RZ12,RX13,RY13,RZ13
+      DOUBLE PRECISION RX23,RY23,RZ23,VX12,VY12,VZ12
+      DOUBLE PRECISION VX13,VY13,VZ13,VX23,VY23,VZ23
+      DOUBLE PRECISION R12R12,R12R13,R12R23,R13R13
+      DOUBLE PRECISION R13R23,R23R23,ZMAT,ZINV
+      DOUBLE PRECISION M1,M2,M3,C1,C2,C3,L1,L2,L3
+      DIMENSION LOCAL_VX(NPERPR,3),LOCAL_VY(NPERPR,3)
+      DIMENSION LOCAL_VZ(NPERPR,3)
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION AMASS(NATOM,3),FIXD(3,3),DMASSI(3)
+      DIMENSION ZMAT(3,3),ZINV(3,3)
+C
+C     This routine subtract from the velocities their components
+C     normal to the constraint surfaces in order to allow the 
+C     constraints time derivatives to vanish.
+C
+      DO 5 N=1,NPERPR_LOC      
+        RX12=LOCAL_X(N,1)-LOCAL_X(N,2)
+        RY12=LOCAL_Y(N,1)-LOCAL_Y(N,2)
+        RZ12=LOCAL_Z(N,1)-LOCAL_Z(N,2)
+        RX12=RX12-BOXL*DNINT(RX12*BOXLI)
+        RY12=RY12-BOXL*DNINT(RY12*BOXLI)
+        RZ12=RZ12-BOXL*DNINT(RZ12*BOXLI)
+        RX13=LOCAL_X(N,1)-LOCAL_X(N,3)
+        RY13=LOCAL_Y(N,1)-LOCAL_Y(N,3)
+        RZ13=LOCAL_Z(N,1)-LOCAL_Z(N,3)
+        RX13=RX13-BOXL*DNINT(RX13*BOXLI)
+        RY13=RY13-BOXL*DNINT(RY13*BOXLI)
+        RZ13=RZ13-BOXL*DNINT(RZ13*BOXLI)
+        RX23=LOCAL_X(N,2)-LOCAL_X(N,3)
+        RY23=LOCAL_Y(N,2)-LOCAL_Y(N,3)
+        RZ23=LOCAL_Z(N,2)-LOCAL_Z(N,3)
+        RX23=RX23-BOXL*DNINT(RX23*BOXLI)
+        RY23=RY23-BOXL*DNINT(RY23*BOXLI)
+        RZ23=RZ23-BOXL*DNINT(RZ23*BOXLI)
+        VX12=LOCAL_VX(N,1)-LOCAL_VX(N,2)
+        VY12=LOCAL_VY(N,1)-LOCAL_VY(N,2)
+        VZ12=LOCAL_VZ(N,1)-LOCAL_VZ(N,2)
+        VX13=LOCAL_VX(N,1)-LOCAL_VX(N,3)
+        VY13=LOCAL_VY(N,1)-LOCAL_VY(N,3)
+        VZ13=LOCAL_VZ(N,1)-LOCAL_VZ(N,3)
+        VX23=LOCAL_VX(N,2)-LOCAL_VX(N,3)
+        VY23=LOCAL_VY(N,2)-LOCAL_VY(N,3)
+        VZ23=LOCAL_VZ(N,2)-LOCAL_VZ(N,3)
+C
+C    Calculate the matrix elements.  
+C
+       R12R12=RX12*RX12+RY12*RY12+RZ12*RZ12
+       R12R13=RX12*RX13+RY12*RY13+RZ12*RZ13
+       R12R23=RX12*RX23+RY12*RY23+RZ12*RZ23
+       R13R13=RX13*RX13+RY13*RY13+RZ13*RZ13
+       R13R23=RX13*RX23+RY13*RY23+RZ13*RZ23
+       R23R23=RX23*RX23+RY23*RY23+RZ23*RZ23
+       ZMAT(1,1) =  R12R12*4.0D0*(DMASSI(1)+DMASSI(2))
+       ZMAT(1,2) =  R12R13*4.0D0*DMASSI(1)
+       ZMAT(1,3) = -R12R23*4.0D0*DMASSI(2)
+       ZMAT(2,1) =  ZMAT(1,2)
+       ZMAT(2,2) =  R13R13*4.0D0*(DMASSI(1)+DMASSI(3))
+       ZMAT(2,3) =  R13R23*4.0D0*DMASSI(3)
+       ZMAT(3,1) =  ZMAT(1,3)
+       ZMAT(3,2) =  ZMAT(2,3)
+       ZMAT(3,3) =  R23R23*4.0D0*(DMASSI(2)+DMASSI(3))
+       C1=2.0D0*(RX12*VX12+RY12*VY12+RZ12*VZ12)
+       C2=2.0D0*(RX13*VX13+RY13*VY13+RZ13*VZ13)
+       C3=2.0D0*(RX23*VX23+RY23*VY23+RZ23*VZ23)
+C
+C    Call the routine to invert the matrix ZMAT
+C
+       CALL ZTMAT(ZMAT,ZINV)
+C
+C    Calculate the coefficients of the velocities.
+C
+       L1=ZINV(1,1)*C1+ZINV(1,2)*C2+ZINV(1,3)*C3
+       L2=ZINV(2,1)*C1+ZINV(2,2)*C2+ZINV(2,3)*C3
+       L3=ZINV(3,1)*C1+ZINV(3,2)*C2+ZINV(3,3)*C3
+C
+C    Calculate the constrained velocities.
+C
+       M1=2.0D0*DMASSI(1)
+       M2=2.0D0*DMASSI(2)
+       M3=2.0D0*DMASSI(3)
+       LOCAL_VX(N,1)=LOCAL_VX(N,1)-M1*L1*RX12-M1*L2*RX13
+       LOCAL_VY(N,1)=LOCAL_VY(N,1)-M1*L1*RY12-M1*L2*RY13
+       LOCAL_VZ(N,1)=LOCAL_VZ(N,1)-M1*L1*RZ12-M1*L2*RZ13
+       LOCAL_VX(N,2)=LOCAL_VX(N,2)+M2*L1*RX12-M2*L3*RX23
+       LOCAL_VY(N,2)=LOCAL_VY(N,2)+M2*L1*RY12-M2*L3*RY23
+       LOCAL_VZ(N,2)=LOCAL_VZ(N,2)+M2*L1*RZ12-M2*L3*RZ23
+       LOCAL_VX(N,3)=LOCAL_VX(N,3)+M3*L2*RX13+M3*L3*RX23
+       LOCAL_VY(N,3)=LOCAL_VY(N,3)+M3*L2*RY13+M3*L3*RY23
+       LOCAL_VZ(N,3)=LOCAL_VZ(N,3)+M3*L2*RZ13+M3*L3*RZ23
+   5   CONTINUE
+      RETURN
+      END
+
+      SUBROUTINE GAUSSV(ISEED,RN)
+      IMPLICIT NONE
+      INTEGER ISEED
+      DOUBLE PRECISION R,RAN3,V1,V2,RN
+      R=2.0D0
+      DO WHILE(R.GE.1.0D0)
+        CALL RANDOM(ISEED,RAN3)
+        V1=2.0D0*RAN3-1.0D0
+        CALL RANDOM(ISEED,RAN3)
+        V2=2.0D0*RAN3-1.0D0
+        R=V1*V1+V2*V2
+      END DO
+      RN=V1*DSQRT(-2.0D0*DLOG(R)/R)
+      RETURN
+      END
+
+      SUBROUTINE ATKIN(LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS,
+     $                 AMASSF,AKIN,NATOM,NSITE,NRIGID,NPRIM,NATOMS,
+     $                 NPERPR,NFP,NPERPR_LOC,NFP_LOC)
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NRIGID,NPRIM,NATOMS,I,J,NPERPR,NFP
+      INTEGER NPERPR_LOC,NFP_LOC
+      DOUBLE PRECISION LOCAL_VX,LOCAL_VY,LOCAL_VZ,LOCAL_VELF,AMASS
+      DOUBLE PRECISION AMASSF,AKIN,BOLTZK
+      DIMENSION LOCAL_VX(NPERPR,3),LOCAL_VY(NPERPR,3)
+      DIMENSION LOCAL_VZ(NPERPR,3)
+      DIMENSION LOCAL_VELF(NFP,3),AMASS(NATOM,3),AMASSF(NATOMS)
+      PARAMETER (BOLTZK=0.831447203385D0)
+
+      AKIN=0.0D0
+      DO 2 I=1,NPERPR_LOC
+        DO 1 J=1,NPRIM
+          AKIN=AKIN+AMASS(I,J)*(LOCAL_VX(I,J)*LOCAL_VX(I,J)+
+     $                          LOCAL_VY(I,J)*LOCAL_VY(I,J)+
+     $                          LOCAL_VZ(I,J)*LOCAL_VZ(I,J))
+    1   CONTINUE
+    2 CONTINUE
+      DO 3 I=1,NFP_LOC
+        AKIN=AKIN+AMASSF(I)*(LOCAL_VELF(I,1)*LOCAL_VELF(I,1)+
+     $                       LOCAL_VELF(I,2)*LOCAL_VELF(I,2)+
+     $                       LOCAL_VELF(I,3)*LOCAL_VELF(I,3))
+    3 CONTINUE        
+      RETURN
+      END
+
+      SUBROUTINE RANDOM(IDUM,RAN3)
+      IMPLICIT NONE
+      INTEGER IDUM
+      INTEGER MBIG,MSEED,MZ
+      DOUBLE PRECISION RAN3,FAC
+      PARAMETER(MBIG=1000000000,MSEED=161803398,MZ=0,FAC=1.0D0/MBIG)
+      INTEGER I,IFF,II,INEXT,INEXTP,K
+      INTEGER MJ,MK,MA(55)
+      SAVE IFF,INEXT,INEXTP,MA
+      DATA IFF /0/
+      
+      IF(IDUM.LT.0.OR.IFF.EQ.0) THEN
+         IFF=1
+         MJ=ABS(MSEED-ABS(IDUM))
+         MJ=MOD(MJ,MBIG)
+         MA(55)=MJ
+         MK=1
+         DO 11 I=1,54
+              II=MOD(21*I,55)
+              MA(II)=MK
+              MK=MJ-MK
+              IF(MK.LT.MZ)MK=MK+MBIG
+              MJ=MA(II)
+   11    CONTINUE
+         DO 13 K=1,4
+              DO 12 I=1,55
+                   MA(I)=MA(I)-MA(1+MOD(I+30,55))
+                   IF(MA(I).LT.MZ)MA(I)=MA(I)+MBIG
+   12         CONTINUE
+   13    CONTINUE
+         INEXT=0
+         INEXTP=31
+         IDUM=1
+      ENDIF       
+      INEXT=INEXT+1
+      IF(INEXT.EQ.56)INEXT=1
+      INEXTP=INEXTP+1
+      IF(INEXTP.EQ.56)INEXTP=1
+      MJ=MA(INEXT)-MA(INEXTP)
+      IF(MJ.LT.MZ)MJ=MJ+MBIG
+      MA(INEXT)=MJ
+      RAN3=MJ*FAC
+      RETURN
+      END
+
+      SUBROUTINE KSETUP(BOXLI,ALPHA,KMAX)
+      IMPLICIT NONE
+      INTEGER NK,NX,NY,NZ,KSQ,KSCUT,KMAX
+      DOUBLE PRECISION BOXLI,ALPHA,PI,FACT,FACT2
+      DOUBLE PRECISION SIGMA,XK,YK,ZK,RKSQ,VECK
+      PARAMETER(KSCUT=105)
+      COMMON/KVEC/VECK(10000)
+
+      PI=DACOS(-1.0D0)
+      FACT=2.0D0*PI*BOXLI
+      FACT2=2.0D0*FACT*BOXLI*BOXLI
+      SIGMA=1.0D0/4.0D0/ALPHA/ALPHA
+      NK=0
+      DO 3 NX=0,KMAX
+        XK=FACT*DFLOAT(NX)
+        DO 2 NY=-KMAX,KMAX
+          YK=FACT*DFLOAT(NY)
+          DO 1 NZ=-KMAX,KMAX
+            ZK=FACT*DFLOAT(NZ)
+            KSQ=NX*NX+NY*NY+NZ*NZ
+            IF (KSQ.NE.0.AND.KSQ.LE.KSCUT) THEN
+              NK=NK+1
+              RKSQ=XK*XK+YK*YK+ZK*ZK
+              VECK(NK)=FACT2*DEXP(-SIGMA*RKSQ)/RKSQ
+            END IF
+    1     CONTINUE
+    2   CONTINUE
+    3 CONTINUE
+      write(74,*)'NO.OF WAVE VECTORS NK=',NK
+      RETURN
+      END
+
+      SUBROUTINE RWALD(X,Y,Z,FX,FY,FZ,POSF,FF,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $                 LOCAL_POSF,FF_S,FF_SUM,RXCM,RYCM,RZCM,RXCMF,
+     $                 RYCMF,RZCMF,BOXL,BOXLI,ALPHA,E0,EC,E0_S,EC_S,
+     $                 VIRLJCR,VIRLJCR_S,RLOWER,RUPPER,RL2,RU2,AS,BS,
+     $                 CS,RLOWS,RUPPS,RLS2,RUS2,ASS,BSS,CSS,PI,NATOM,
+     $                 NSITE,NRIGID,NATOMS,NSOL,NATSOL,NPERPR,NFP,RANK,
+     $                 NPERPF,NPERPR_LOC,NPERPF_LOC,NFP_LOC)
+C
+C     This is the energy and derivatives in real space
+C     
+      IMPLICIT NONE
+      INTEGER I,J,K,L,M,N,IJ,RANK,MY,NPERPF,MY_F,MY_FATM
+      INTEGER NATOM,NSITE,NRIGID,NATOMS,NSOL,NATSOL,NPERPR,NFP
+      INTEGER NBON14,INBON14,JNBON14,NBON,INBON,JNBON,NINDX1,IERR
+      INTEGER NPERPR_LOC,NPERPF_LOC,NFP_LOC
+      DOUBLE PRECISION X,Y,Z,FX,FY,FZ,POSF,FF,BOXL,BOXLI,ALPHA
+      DOUBLE PRECISION RLOWER,RUPPER,RL2,RU2,AS,BS,CS,FF_S,FF_SUM
+      DOUBLE PRECISION RLOWS,RUPPS,RLS2,RUS2,ASS,BSS,CSS,PI
+      DOUBLE PRECISION ASPC,CSPC,RSPC,RSPC2,ESPC,Q,QF,RXIJ11
+      DOUBLE PRECISION RYIJ11,RZIJ11,RIJ2IJ,RIJ,SUMQQ,R2,R6,R12
+      DOUBLE PRECISION ELJ,COMFAC,E0,E01,E02,E03,E04,EC,EC1,EC2
+      DOUBLE PRECISION EC3,EC4,FXIJ11,FYIJ11,FZIJ11,RXIJKL,RYIJKL
+      DOUBLE PRECISION RZIJKL,RIJSQ1,RIJ1,Q1,FACT1,FXIJKL,FYIJKL
+      DOUBLE PRECISION FZIJKL,TERM1,TERM1A,ELJO,ZR,ZRSQ,ZRCQ
+      DOUBLE PRECISION ZRQQ,ZRPQ,SZR,DSZR,COMFAC1,COMFAC2,TERM1AA
+      DOUBLE PRECISION XCMI1,YCMI1,ZCMI1,XCMJ1,YCMJ1,ZCMJ1
+      DOUBLE PRECISION XCMIK,YCMIK,ZCMIK,XCMJL,YCMJL,ZCMJL
+      DOUBLE PRECISION RXCM,RYCM,RZCM,RXCMF,RYCMF,RZCMF
+      DOUBLE PRECISION RSOL,ESOL,RWSOL,EWSOL,RARITH,EGEOM
+      DOUBLE PRECISION SCVDW14,SCELE14,RIJ2I,XCMNI,YCMNI,ZCMNI
+      DOUBLE PRECISION XCMNJ,YCMNJ,ZCMNJ,XCMMJ,YCMMJ,ZCMMJ
+      DOUBLE PRECISION XCMIL,YCMIL,ZCMIL,RXIJL1,RYIJL1,RZIJL1
+      DOUBLE PRECISION RIJL1,RIJL1SQ,FXIJL1,FYIJL1,FZIJL1
+      DOUBLE PRECISION VIRIJXX,VIRIJYY,VIRIJZZ
+      DOUBLE PRECISION VIRLRXX,VIRLRYY,VIRLRZZ,VIRLJCR
+      DOUBLE PRECISION V,RINCR,RINCRI,RN1,E0_S,EC_S
+      DOUBLE PRECISION LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_POSF
+      DOUBLE PRECISION VIRLRXX_S,VIRLRYY_S,VIRLRZZ_S,VIRLJCR_S
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION FX(NATOM,NSITE),FY(NATOM,NSITE),FZ(NATOM,NSITE)
+      DIMENSION POSF(NATOMS,3),FF(NATOMS,3)
+      DIMENSION FF_S(NATOMS,3),FF_SUM(NATOMS,3)
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE),LOCAL_POSF(NFP,3)      
+      DIMENSION RXCM(NATOM),RYCM(NATOM),RZCM(NATOM)
+      DIMENSION RXCMF(NSOL),RYCMF(NSOL),RZCMF(NSOL)
+      COMMON/FLEXI/RSOL(2000),ESOL(2000),RWSOL(2000),EWSOL(2000),
+     $             SCVDW14,SCELE14,NBON14,INBON14(2000),
+     $             JNBON14(2000),NBON,INBON(5000),JNBON(5000)
+      COMMON/WATER/ASPC,CSPC,RSPC,RSPC2,ESPC,Q(1000,4)
+      COMMON/SOLUT/QF(1000)
+      COMMON/VTABLE/V(4,500000),RINCR,RINCRI
+
+      INCLUDE 'mpif.h'
+      DOUBLE PRECISION SCATTERBUF_2,SCATTERLOCAL_2
+      DIMENSION SCATTERBUF_2(3,NATOMS),SCATTERLOCAL_2(3,NFP)
+C
+C     Local variables
+C
+      MY=RANK*NPERPR
+      MY_F=RANK*NPERPF
+      MY_FATM=RANK*NFP
+C
+C     Do solvent-solvent interactions
+C
+      E0=0.0D0
+      EC=0.0D0
+      VIRLRXX=0.0D0
+      VIRLRYY=0.0D0
+      VIRLRZZ=0.0D0    
+      DO 2 I=1,NPERPR_LOC
+        DO 1 J=1,NRIGID
+          IF(J.NE.I+MY)THEN
+          RXIJ11=LOCAL_X(I,1)-X(J,1)
+          RYIJ11=LOCAL_Y(I,1)-Y(J,1)
+          RZIJ11=LOCAL_Z(I,1)-Z(J,1)
+          RXIJ11=RXIJ11-BOXL*DNINT(RXIJ11*BOXLI)
+          RYIJ11=RYIJ11-BOXL*DNINT(RYIJ11*BOXLI)
+          RZIJ11=RZIJ11-BOXL*DNINT(RZIJ11*BOXLI)
+          RIJ2IJ=RXIJ11*RXIJ11+RYIJ11*RYIJ11+RZIJ11*RZIJ11
+          SUMQQ=0.0D0
+          VIRIJXX=0.0D0
+          VIRIJYY=0.0D0
+          VIRIJZZ=0.0D0
+          IF(RIJ2IJ.LE.RL2)THEN
+            R2=1.0D0/RIJ2IJ
+            R6=R2*R2*R2
+            R12=R6*R6
+            ELJ=(ASPC*R12-CSPC*R6)
+            COMFAC=-6.0D0*(2.0D0*ASPC*R12-CSPC*R6)*R2
+            FXIJ11=-COMFAC*RXIJ11
+            FYIJ11=-COMFAC*RYIJ11
+            FZIJ11=-COMFAC*RZIJ11
+            E0=E0+ELJ
+            FX(I,1)=FX(I,1)+FXIJ11
+            FY(I,1)=FY(I,1)+FYIJ11
+            FZ(I,1)=FZ(I,1)+FZIJ11
+            XCMI1=RXCM(I+MY)-LOCAL_X(I,1)
+            YCMI1=RYCM(I+MY)-LOCAL_Y(I,1)
+            ZCMI1=RZCM(I+MY)-LOCAL_Z(I,1)
+            XCMJ1=RXCM(J)-X(J,1)
+            YCMJ1=RYCM(J)-Y(J,1)
+            ZCMJ1=RZCM(J)-Z(J,1)
+            VIRIJXX=VIRIJXX+(RXIJ11+XCMI1-XCMJ1)*FXIJ11
+            VIRIJYY=VIRIJYY+(RYIJ11+YCMI1-YCMJ1)*FYIJ11
+            VIRIJZZ=VIRIJZZ+(RZIJ11+ZCMI1-ZCMJ1)*FZIJ11
+           DO K=2,NSITE
+             DO L=2,NSITE
+               RXIJKL=LOCAL_X(I,K)-X(J,L)
+               RYIJKL=LOCAL_Y(I,K)-Y(J,L)
+               RZIJKL=LOCAL_Z(I,K)-Z(J,L)
+               RXIJKL=RXIJKL-BOXL*DNINT(RXIJKL*BOXLI)
+               RYIJKL=RYIJKL-BOXL*DNINT(RYIJKL*BOXLI)
+               RZIJKL=RZIJKL-BOXL*DNINT(RZIJKL*BOXLI)
+               RIJSQ1=RXIJKL*RXIJKL+RYIJKL*RYIJKL+RZIJKL*RZIJKL
+               RIJ1=DSQRT(RIJSQ1)
+               Q1=Q(I,K)*Q(J,L)
+               NINDX1=INT(RIJ1*RINCRI)
+               RN1=RINCR*NINDX1
+               FACT1=RIJ1-RN1
+               TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $                   V(3,NINDX1)))
+               TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $                    V(4,NINDX1)))/RIJ1
+               FXIJKL=-TERM1A*RXIJKL
+               FYIJKL=-TERM1A*RYIJKL
+               FZIJKL=-TERM1A*RZIJKL
+               SUMQQ=SUMQQ+TERM1
+               FX(I,K)=FX(I,K)+FXIJKL
+               FY(I,K)=FY(I,K)+FYIJKL
+               FZ(I,K)=FZ(I,K)+FZIJKL
+               XCMIK=RXCM(I+MY)-LOCAL_X(I,K)
+               YCMIK=RYCM(I+MY)-LOCAL_Y(I,K)
+               ZCMIK=RZCM(I+MY)-LOCAL_Z(I,K)
+               XCMJL=RXCM(J)-X(J,L)
+               YCMJL=RYCM(J)-Y(J,L)
+               ZCMJL=RZCM(J)-Z(J,L)
+               VIRIJXX=VIRIJXX+(RXIJKL+XCMIK-XCMJL)*FXIJKL
+               VIRIJYY=VIRIJYY+(RYIJKL+YCMIK-YCMJL)*FYIJKL
+               VIRIJZZ=VIRIJZZ+(RZIJKL+ZCMIK-ZCMJL)*FZIJKL
+             END DO
+           END DO
+          ELSEIF(RIJ2IJ.GT.RL2.AND.RIJ2IJ.LE.RU2)THEN
+            R2=1.0D0/RIJ2IJ
+            R6=R2*R2*R2
+            R12=R6*R6
+            ELJO=(ASPC*R12-CSPC*R6)
+            ZR=RIJ2IJ-RL2
+            ZRSQ=ZR*ZR
+            ZRCQ=ZRSQ*ZR
+            ZRQQ=ZRCQ*ZR
+            ZRPQ=ZRQQ*ZR
+            SZR=1.D0+AS*ZRCQ+BS*ZRQQ+CS*ZRPQ
+            DSZR=6.D0*AS*ZRSQ+8.D0*BS*ZRCQ+10.D0*CS*ZRQQ
+            ELJ=ELJO*SZR
+            COMFAC1=-6.0D0*(2.0D0*ASPC*R12-CSPC*R6)*R2
+            COMFAC2=ELJO*DSZR
+            FXIJ11=-(COMFAC1*SZR+COMFAC2)*RXIJ11
+            FYIJ11=-(COMFAC1*SZR+COMFAC2)*RYIJ11
+            FZIJ11=-(COMFAC1*SZR+COMFAC2)*RZIJ11
+            E0=E0+ELJ
+            FX(I,1)=FX(I,1)+FXIJ11
+            FY(I,1)=FY(I,1)+FYIJ11
+            FZ(I,1)=FZ(I,1)+FZIJ11
+            XCMI1=RXCM(I+MY)-LOCAL_X(I,1)
+            YCMI1=RYCM(I+MY)-LOCAL_Y(I,1)
+            ZCMI1=RZCM(I+MY)-LOCAL_Z(I,1)
+            XCMJ1=RXCM(J)-X(J,1)
+            YCMJ1=RYCM(J)-Y(J,1)
+            ZCMJ1=RZCM(J)-Z(J,1)
+            VIRIJXX=VIRIJXX+(RXIJ11+XCMI1-XCMJ1)*FXIJ11
+            VIRIJYY=VIRIJYY+(RYIJ11+YCMI1-YCMJ1)*FYIJ11
+            VIRIJZZ=VIRIJZZ+(RZIJ11+ZCMI1-ZCMJ1)*FZIJ11
+           DO K=2,NSITE
+             DO L=2,NSITE
+               RXIJKL=LOCAL_X(I,K)-X(J,L)
+               RYIJKL=LOCAL_Y(I,K)-Y(J,L)
+               RZIJKL=LOCAL_Z(I,K)-Z(J,L)
+               RXIJKL=RXIJKL-BOXL*DNINT(RXIJKL*BOXLI)
+               RYIJKL=RYIJKL-BOXL*DNINT(RYIJKL*BOXLI)
+               RZIJKL=RZIJKL-BOXL*DNINT(RZIJKL*BOXLI)
+               RIJSQ1=RXIJKL*RXIJKL+RYIJKL*RYIJKL+RZIJKL*RZIJKL
+               RIJ1=DSQRT(RIJSQ1)
+               Q1=Q(I,K)*Q(J,L)
+               NINDX1=INT(RIJ1*RINCRI)
+               RN1=RINCR*NINDX1
+               FACT1=RIJ1-RN1
+               TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $                   V(3,NINDX1)))
+               TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $                    V(4,NINDX1)))/RIJ1
+               TERM1AA=TERM1A*SZR
+               FXIJKL=-TERM1AA*RXIJKL
+               FYIJKL=-TERM1AA*RYIJKL
+               FZIJKL=-TERM1AA*RZIJKL
+               SUMQQ=SUMQQ+TERM1*SZR
+               FX(I,K)=FX(I,K)+FXIJKL
+               FY(I,K)=FY(I,K)+FYIJKL
+               FZ(I,K)=FZ(I,K)+FZIJKL
+               XCMIK=RXCM(I+MY)-LOCAL_X(I,K)
+               YCMIK=RYCM(I+MY)-LOCAL_Y(I,K)
+               ZCMIK=RZCM(I+MY)-LOCAL_Z(I,K)
+               XCMJL=RXCM(J)-X(J,L)
+               YCMJL=RYCM(J)-Y(J,L)
+               ZCMJL=RZCM(J)-Z(J,L)
+               VIRIJXX=VIRIJXX+(RXIJKL+XCMIK-XCMJL)*FXIJKL
+               VIRIJYY=VIRIJYY+(RYIJKL+YCMIK-YCMJL)*FYIJKL
+               VIRIJZZ=VIRIJZZ+(RZIJKL+ZCMIK-ZCMJL)*FZIJKL
+             END DO
+           END DO
+          END IF            
+           EC=EC+SUMQQ
+           VIRLRXX=VIRLRXX+VIRIJXX
+           VIRLRYY=VIRLRYY+VIRIJYY
+           VIRLRZZ=VIRLRZZ+VIRIJZZ
+          END IF                                
+   1    CONTINUE
+   2  CONTINUE
+C
+C     Do solvent-solute interactions
+C
+      E01=0.0D0     
+      EC1=0.0D0
+      VIRLRXX_S=0.0D0
+      VIRLRYY_S=0.0D0
+      VIRLRZZ_S=0.0D0
+      DO 5 N=1,NSOL
+        DO 4 I=1,NPERPR_LOC
+          DO 3 K=1,NATSOL
+            J=(N-1)*NATSOL+K  
+            RXIJ11=LOCAL_X(I,1)-POSF(J,1)
+            RYIJ11=LOCAL_Y(I,1)-POSF(J,2)
+            RZIJ11=LOCAL_Z(I,1)-POSF(J,3)
+            RXIJ11=RXIJ11-BOXL*DNINT(RXIJ11*BOXLI)
+            RYIJ11=RYIJ11-BOXL*DNINT(RYIJ11*BOXLI)
+            RZIJ11=RZIJ11-BOXL*DNINT(RZIJ11*BOXLI)
+            RIJ2IJ=RXIJ11*RXIJ11+RYIJ11*RYIJ11+RZIJ11*RZIJ11
+            VIRIJXX=0.0D0
+            VIRIJYY=0.0D0
+            VIRIJZZ=0.0D0
+            SUMQQ=0.0D0
+            IF(RIJ2IJ.LE.RLS2)THEN
+              RIJ2I=1.0D0/RIJ2IJ
+              R2=RWSOL(J)*RWSOL(J)*RIJ2I
+              R6=R2*R2*R2
+              R12=R6*R6
+              ELJ=EWSOL(J)*(R12-2.0D0*R6)
+              COMFAC=-12.0D0*EWSOL(J)*(R12-R6)*RIJ2I
+              FXIJ11=-COMFAC*RXIJ11
+              FYIJ11=-COMFAC*RYIJ11
+              FZIJ11=-COMFAC*RZIJ11
+              E01=E01+ELJ
+              FX(I,1)=FX(I,1)+FXIJ11
+              FY(I,1)=FY(I,1)+FYIJ11
+              FZ(I,1)=FZ(I,1)+FZIJ11
+              FF_S(J,1)=FF_S(J,1)-FXIJ11
+              FF_S(J,2)=FF_S(J,2)-FYIJ11
+              FF_S(J,3)=FF_S(J,3)-FZIJ11
+              XCMI1=RXCM(I+MY)-LOCAL_X(I,1)
+              YCMI1=RYCM(I+MY)-LOCAL_Y(I,1)
+              ZCMI1=RZCM(I+MY)-LOCAL_Z(I,1)
+              XCMNJ=RXCMF(N)-POSF(J,1)
+              YCMNJ=RYCMF(N)-POSF(J,2)
+              ZCMNJ=RZCMF(N)-POSF(J,3)
+              VIRIJXX=VIRIJXX+(RXIJ11+XCMI1-XCMNJ)*FXIJ11
+              VIRIJYY=VIRIJYY+(RYIJ11+YCMI1-YCMNJ)*FYIJ11
+              VIRIJZZ=VIRIJZZ+(RZIJ11+ZCMI1-ZCMNJ)*FZIJ11
+              DO L=2,NSITE
+                RXIJL1=LOCAL_X(I,L)-POSF(J,1)
+                RYIJL1=LOCAL_Y(I,L)-POSF(J,2)
+                RZIJL1=LOCAL_Z(I,L)-POSF(J,3)
+                RXIJL1=RXIJL1-BOXL*DNINT(RXIJL1*BOXLI)
+                RYIJL1=RYIJL1-BOXL*DNINT(RYIJL1*BOXLI)
+                RZIJL1=RZIJL1-BOXL*DNINT(RZIJL1*BOXLI)
+                RIJL1SQ=RXIJL1*RXIJL1+RYIJL1*RYIJL1+RZIJL1*RZIJL1
+                RIJL1=DSQRT(RIJL1SQ)
+                Q1=Q(I,L)*QF(J)
+                NINDX1=INT(RIJL1*RINCRI)
+                RN1=RINCR*NINDX1
+                FACT1=RIJL1-RN1
+                TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $                   V(3,NINDX1)))
+                TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $                    V(4,NINDX1)))/RIJL1
+                FXIJL1=-TERM1A*RXIJL1
+                FYIJL1=-TERM1A*RYIJL1
+                FZIJL1=-TERM1A*RZIJL1
+                SUMQQ=SUMQQ+TERM1
+                FX(I,L)=FX(I,L)+FXIJL1
+                FY(I,L)=FY(I,L)+FYIJL1
+                FZ(I,L)=FZ(I,L)+FZIJL1
+                FF_S(J,1)=FF_S(J,1)-FXIJL1
+                FF_S(J,2)=FF_S(J,2)-FYIJL1
+                FF_S(J,3)=FF_S(J,3)-FZIJL1
+                XCMIL=RXCM(I+MY)-LOCAL_X(I,L)
+                YCMIL=RYCM(I+MY)-LOCAL_Y(I,L)
+                ZCMIL=RZCM(I+MY)-LOCAL_Z(I,L)
+                XCMNJ=RXCMF(N)-POSF(J,1)
+                YCMNJ=RYCMF(N)-POSF(J,2)
+                ZCMNJ=RZCMF(N)-POSF(J,3)
+                VIRIJXX=VIRIJXX+(RXIJL1+XCMIL-XCMNJ)*FXIJL1
+                VIRIJYY=VIRIJYY+(RYIJL1+YCMIL-YCMNJ)*FYIJL1
+                VIRIJZZ=VIRIJZZ+(RZIJL1+ZCMIL-ZCMNJ)*FZIJL1
+              END DO
+            ELSEIF(RIJ2IJ.GT.RLS2.AND.RIJ2IJ.LE.RUS2)THEN
+              RIJ2I=1.0D0/RIJ2IJ
+              R2=RWSOL(J)*RWSOL(J)*RIJ2I
+              R6=R2*R2*R2
+              R12=R6*R6
+              ELJO=EWSOL(J)*(R12-2.0D0*R6)
+              ZR=RIJ2IJ-RLS2
+              ZRSQ=ZR*ZR
+              ZRCQ=ZRSQ*ZR
+              ZRQQ=ZRCQ*ZR
+              ZRPQ=ZRQQ*ZR
+              SZR=1.D0+ASS*ZRCQ+BSS*ZRQQ+CSS*ZRPQ
+              DSZR=6.D0*ASS*ZRSQ+8.D0*BSS*ZRCQ+10.D0*CSS*ZRQQ
+              ELJ=ELJO*SZR
+              COMFAC1=-12.0D0*EWSOL(J)*(R12-R6)*RIJ2I
+              COMFAC2=ELJO*DSZR
+              FXIJ11=-(COMFAC1*SZR+COMFAC2)*RXIJ11
+              FYIJ11=-(COMFAC1*SZR+COMFAC2)*RYIJ11
+              FZIJ11=-(COMFAC1*SZR+COMFAC2)*RZIJ11
+              E01=E01+ELJ
+              FX(I,1)=FX(I,1)+FXIJ11
+              FY(I,1)=FY(I,1)+FYIJ11
+              FZ(I,1)=FZ(I,1)+FZIJ11
+              FF_S(J,1)=FF_S(J,1)-FXIJ11
+              FF_S(J,2)=FF_S(J,2)-FYIJ11
+              FF_S(J,3)=FF_S(J,3)-FZIJ11
+              XCMI1=RXCM(I+MY)-LOCAL_X(I,1)
+              YCMI1=RYCM(I+MY)-LOCAL_Y(I,1)
+              ZCMI1=RZCM(I+MY)-LOCAL_Z(I,1)
+              XCMNJ=RXCMF(N)-POSF(J,1)
+              YCMNJ=RYCMF(N)-POSF(J,2)
+              ZCMNJ=RZCMF(N)-POSF(J,3)
+              VIRIJXX=VIRIJXX+(RXIJ11+XCMI1-XCMNJ)*FXIJ11
+              VIRIJYY=VIRIJYY+(RYIJ11+YCMI1-YCMNJ)*FYIJ11
+              VIRIJZZ=VIRIJZZ+(RZIJ11+ZCMI1-ZCMNJ)*FZIJ11
+              DO L=2,NSITE
+                RXIJL1=LOCAL_X(I,L)-POSF(J,1)
+                RYIJL1=LOCAL_Y(I,L)-POSF(J,2)
+                RZIJL1=LOCAL_Z(I,L)-POSF(J,3)
+                RXIJL1=RXIJL1-BOXL*DNINT(RXIJL1*BOXLI)
+                RYIJL1=RYIJL1-BOXL*DNINT(RYIJL1*BOXLI)
+                RZIJL1=RZIJL1-BOXL*DNINT(RZIJL1*BOXLI)
+                RIJL1SQ=RXIJL1*RXIJL1+RYIJL1*RYIJL1+RZIJL1*RZIJL1
+                RIJL1=DSQRT(RIJL1SQ)
+                Q1=Q(I,L)*QF(J)
+                NINDX1=INT(RIJL1*RINCRI)
+                RN1=RINCR*NINDX1
+                FACT1=RIJL1-RN1
+                TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $                   V(3,NINDX1)))
+                TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $                    V(4,NINDX1)))/RIJL1
+                TERM1AA=TERM1A*SZR
+                FXIJL1=-TERM1AA*RXIJL1
+                FYIJL1=-TERM1AA*RYIJL1
+                FZIJL1=-TERM1AA*RZIJL1
+                SUMQQ=SUMQQ+TERM1*SZR
+                FX(I,L)=FX(I,L)+FXIJL1
+                FY(I,L)=FY(I,L)+FYIJL1
+                FZ(I,L)=FZ(I,L)+FZIJL1
+                FF_S(J,1)=FF_S(J,1)-FXIJL1
+                FF_S(J,2)=FF_S(J,2)-FYIJL1
+                FF_S(J,3)=FF_S(J,3)-FZIJL1
+                XCMIL=RXCM(I+MY)-LOCAL_X(I,L)
+                YCMIL=RYCM(I+MY)-LOCAL_Y(I,L)
+                ZCMIL=RZCM(I+MY)-LOCAL_Z(I,L)
+                XCMNJ=RXCMF(N)-POSF(J,1)
+                YCMNJ=RYCMF(N)-POSF(J,2)
+                ZCMNJ=RZCMF(N)-POSF(J,3)
+                VIRIJXX=VIRIJXX+(RXIJL1+XCMIL-XCMNJ)*FXIJL1
+                VIRIJYY=VIRIJYY+(RYIJL1+YCMIL-YCMNJ)*FYIJL1
+                VIRIJZZ=VIRIJZZ+(RZIJL1+ZCMIL-ZCMNJ)*FZIJL1
+              END DO
+            END IF
+            EC1=EC1+SUMQQ
+            VIRLRXX_S=VIRLRXX_S+VIRIJXX
+            VIRLRYY_S=VIRLRYY_S+VIRIJYY
+            VIRLRZZ_S=VIRLRZZ_S+VIRIJZZ
+   3      CONTINUE  
+   4    CONTINUE
+   5  CONTINUE
+C
+C     Do solute-solute 1-4 nbonded interactions
+C
+      E02=0.0D0
+      EC2=0.0D0
+      DO 6 IJ=1,NBON14
+        I=INBON14(IJ)
+        J=JNBON14(IJ)
+        RXIJ11=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+        RYIJ11=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+        RZIJ11=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+        RXIJ11=RXIJ11-BOXL*DNINT(RXIJ11*BOXLI)
+        RYIJ11=RYIJ11-BOXL*DNINT(RYIJ11*BOXLI)
+        RZIJ11=RZIJ11-BOXL*DNINT(RZIJ11*BOXLI)
+        RIJ2IJ=RXIJ11*RXIJ11+RYIJ11*RYIJ11+RZIJ11*RZIJ11
+        IF(RIJ2IJ.LE.RLS2)THEN
+          RIJ2I=1.0D0/RIJ2IJ
+          RARITH=RSOL(I)+RSOL(J)
+          EGEOM=DSQRT(ESOL(I)*ESOL(J))
+          R2=RARITH*RARITH*RIJ2I
+          R6=R2*R2*R2
+          R12=R6*R6
+          ELJ=SCVDW14*EGEOM*(R12-2.0D0*R6)
+          E02=E02+ELJ
+          COMFAC=-12.0D0*SCVDW14*EGEOM*(R12-R6)*RIJ2I
+          RIJ1=DSQRT(RIJ2IJ)
+          Q1=SCELE14*QF(I)*QF(J)
+          NINDX1=INT(RIJ1*RINCRI)
+          RN1=RINCR*NINDX1
+          FACT1=RIJ1-RN1
+          TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $              V(3,NINDX1)))
+          TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $               V(4,NINDX1)))/RIJ1
+          FXIJ11=-(COMFAC+TERM1A)*RXIJ11
+          FYIJ11=-(COMFAC+TERM1A)*RYIJ11
+          FZIJ11=-(COMFAC+TERM1A)*RZIJ11
+          EC2=EC2+TERM1
+          FF(I,1)=FF(I,1)+FXIJ11
+          FF(I,2)=FF(I,2)+FYIJ11
+          FF(I,3)=FF(I,3)+FZIJ11
+          FF(J,1)=FF(J,1)-FXIJ11
+          FF(J,2)=FF(J,2)-FYIJ11
+          FF(J,3)=FF(J,3)-FZIJ11
+        ELSEIF(RIJ2IJ.GT.RLS2.AND.RIJ2IJ.LE.RUS2)THEN
+          RIJ2I=1.0D0/RIJ2IJ
+          RARITH=RSOL(I)+RSOL(J)
+          EGEOM=DSQRT(ESOL(I)*ESOL(J))
+          R2=RARITH*RARITH*RIJ2I
+          R6=R2*R2*R2
+          R12=R6*R6
+          ELJO=SCVDW14*EGEOM*(R12-2.0D0*R6)
+          ZR=RIJ2IJ-RLS2
+          ZRSQ=ZR*ZR
+          ZRCQ=ZRSQ*ZR
+          ZRQQ=ZRCQ*ZR
+          ZRPQ=ZRQQ*ZR
+          SZR=1.D0+ASS*ZRCQ+BSS*ZRQQ+CSS*ZRPQ
+          DSZR=6.D0*ASS*ZRSQ+8.D0*BSS*ZRCQ+10.D0*CSS*ZRQQ
+          ELJ=ELJO*SZR
+          E02=E02+ELJ
+          COMFAC1=-12.0D0*SCVDW14*EGEOM*(R12-R6)*RIJ2I
+          COMFAC2=ELJO*DSZR
+          COMFAC=-(COMFAC1*SZR+COMFAC2)
+          RIJ1=DSQRT(RIJ2IJ)
+          Q1=SCELE14*QF(I)*QF(J)
+          NINDX1=INT(RIJ1*RINCRI)
+          RN1=RINCR*NINDX1
+          FACT1=RIJ1-RN1
+          TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $              V(3,NINDX1)))
+          TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $               V(4,NINDX1)))/RIJ1
+          TERM1AA=-(TERM1A*SZR+TERM1*DSZR)
+          FXIJ11=(COMFAC+TERM1AA)*RXIJ11
+          FYIJ11=(COMFAC+TERM1AA)*RYIJ11
+          FZIJ11=(COMFAC+TERM1AA)*RZIJ11
+          EC2=EC2+TERM1*SZR
+          FF(I,1)=FF(I,1)+FXIJ11
+          FF(I,2)=FF(I,2)+FYIJ11
+          FF(I,3)=FF(I,3)+FZIJ11
+          FF(J,1)=FF(J,1)-FXIJ11
+          FF(J,2)=FF(J,2)-FYIJ11
+          FF(J,3)=FF(J,3)-FZIJ11
+       END IF
+   6  CONTINUE
+C
+C     Do solute-solute nbonded interactions
+C
+      E03=0.0D0     
+      EC3=0.0D0
+      DO 7 IJ=1,NBON
+        I=INBON(IJ)
+        J=JNBON(IJ)
+        RXIJ11=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+        RYIJ11=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+        RZIJ11=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+        RXIJ11=RXIJ11-BOXL*DNINT(RXIJ11*BOXLI)
+        RYIJ11=RYIJ11-BOXL*DNINT(RYIJ11*BOXLI)
+        RZIJ11=RZIJ11-BOXL*DNINT(RZIJ11*BOXLI)
+        RIJ2IJ=RXIJ11*RXIJ11+RYIJ11*RYIJ11+RZIJ11*RZIJ11
+        IF(RIJ2IJ.LE.RLS2)THEN
+          RIJ2I=1.0D0/RIJ2IJ
+          RARITH=RSOL(I)+RSOL(J)
+          EGEOM=DSQRT(ESOL(I)*ESOL(J))
+          R2=RARITH*RARITH*RIJ2I
+          R6=R2*R2*R2
+          R12=R6*R6
+          ELJ=EGEOM*(R12-2.0D0*R6)
+          E03=E03+ELJ
+          COMFAC=-12.0D0*EGEOM*(R12-R6)*RIJ2I
+          RIJ1=DSQRT(RIJ2IJ)
+          Q1=QF(I)*QF(J)
+          NINDX1=INT(RIJ1*RINCRI)
+          RN1=RINCR*NINDX1
+          FACT1=RIJ1-RN1
+          TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $              V(3,NINDX1)))
+          TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $               V(4,NINDX1)))/RIJ1
+          FXIJ11=-(COMFAC+TERM1A)*RXIJ11
+          FYIJ11=-(COMFAC+TERM1A)*RYIJ11
+          FZIJ11=-(COMFAC+TERM1A)*RZIJ11
+          EC3=EC3+TERM1
+          FF(I,1)=FF(I,1)+FXIJ11
+          FF(I,2)=FF(I,2)+FYIJ11
+          FF(I,3)=FF(I,3)+FZIJ11
+          FF(J,1)=FF(J,1)-FXIJ11
+          FF(J,2)=FF(J,2)-FYIJ11
+          FF(J,3)=FF(J,3)-FZIJ11
+        ELSEIF(RIJ2IJ.GT.RLS2.AND.RIJ2IJ.LE.RUS2)THEN
+          RIJ2I=1.0D0/RIJ2IJ
+          RARITH=RSOL(I)+RSOL(J)
+          EGEOM=DSQRT(ESOL(I)*ESOL(J))
+          R2=RARITH*RARITH*RIJ2I
+          R6=R2*R2*R2
+          R12=R6*R6
+          ELJO=EGEOM*(R12-2.0D0*R6)
+          ZR=RIJ2IJ-RLS2
+          ZRSQ=ZR*ZR
+          ZRCQ=ZRSQ*ZR
+          ZRQQ=ZRCQ*ZR
+          ZRPQ=ZRQQ*ZR
+          SZR=1.0D0+ASS*ZRCQ+BSS*ZRQQ+CSS*ZRPQ
+          DSZR=6.0D0*ASS*ZRSQ+8.0D0*BSS*ZRCQ+10.0D0*CSS*ZRQQ
+          ELJ=ELJO*SZR
+          E03=E03+ELJ
+          COMFAC1=-12.0D0*EGEOM*(R12-R6)*RIJ2I
+          COMFAC2=ELJO*DSZR
+          COMFAC=-(COMFAC1*SZR+COMFAC2)
+          RIJ1=DSQRT(RIJ2IJ)
+          Q1=QF(I)*QF(J)
+          NINDX1=INT(RIJ1*RINCRI)
+          RN1=RINCR*NINDX1
+          FACT1=RIJ1-RN1
+          TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $              V(3,NINDX1)))
+          TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $               V(4,NINDX1)))/RIJ1
+          TERM1AA=-(TERM1A*SZR+TERM1*DSZR)
+          FXIJ11=(COMFAC+TERM1AA)*RXIJ11
+          FYIJ11=(COMFAC+TERM1AA)*RYIJ11
+          FZIJ11=(COMFAC+TERM1AA)*RZIJ11
+          EC3=EC3+TERM1*SZR
+          FF(I,1)=FF(I,1)+FXIJ11
+          FF(I,2)=FF(I,2)+FYIJ11
+          FF(I,3)=FF(I,3)+FZIJ11
+          FF(J,1)=FF(J,1)-FXIJ11
+          FF(J,2)=FF(J,2)-FYIJ11
+          FF(J,3)=FF(J,3)-FZIJ11
+        END IF
+   7  CONTINUE
+C
+C     Do intermolecular solute-solute interactions
+C
+      E04=0.0D0     
+      EC4=0.0D0
+      DO 11 N=1,NPERPF_LOC
+        DO 10 M=1,NSOL
+          IF(M.NE.N+MY_F)THEN
+          VIRIJXX=0.0D0
+          VIRIJYY=0.0D0
+          VIRIJZZ=0.0D0
+          SUMQQ=0.0D0
+          DO 9 K=1,NATSOL
+            I=(N-1)*NATSOL+K
+            DO 8 L=1,NATSOL
+              J=(M-1)*NATSOL+L
+              RXIJ11=LOCAL_POSF(I,1)-POSF(J,1)
+              RYIJ11=LOCAL_POSF(I,2)-POSF(J,2)
+              RZIJ11=LOCAL_POSF(I,3)-POSF(J,3)
+              RXIJ11=RXIJ11-BOXL*DNINT(RXIJ11*BOXLI)
+              RYIJ11=RYIJ11-BOXL*DNINT(RYIJ11*BOXLI)
+              RZIJ11=RZIJ11-BOXL*DNINT(RZIJ11*BOXLI)
+              RIJ2IJ=RXIJ11*RXIJ11+RYIJ11*RYIJ11+RZIJ11*RZIJ11
+              IF(RIJ2IJ.LE.RLS2)THEN
+                RIJ2I=1.0D0/RIJ2IJ
+                RARITH=RSOL(I)+RSOL(J)
+                EGEOM=DSQRT(ESOL(I)*ESOL(J))
+                R2=RARITH*RARITH*RIJ2I
+                R6=R2*R2*R2
+                R12=R6*R6
+                ELJ=EGEOM*(R12-2.0D0*R6)
+                COMFAC=-12.0D0*EGEOM*(R12-R6)*RIJ2I
+                E04=E04+ELJ
+                RIJ1=DSQRT(RIJ2IJ)
+                Q1=QF(I)*QF(J)
+                NINDX1=INT(RIJ1*RINCRI)
+                RN1=RINCR*NINDX1
+                FACT1=RIJ1-RN1
+                TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $                    V(3,NINDX1)))
+                TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $                     V(4,NINDX1)))/RIJ1
+                FXIJ11=-(COMFAC+TERM1A)*RXIJ11
+                FYIJ11=-(COMFAC+TERM1A)*RYIJ11
+                FZIJ11=-(COMFAC+TERM1A)*RZIJ11
+                SUMQQ=SUMQQ+TERM1
+                FF(I,1)=FF(I,1)+FXIJ11
+                FF(I,2)=FF(I,2)+FYIJ11
+                FF(I,3)=FF(I,3)+FZIJ11
+                XCMNI=RXCMF(N+MY_F)-LOCAL_POSF(I,1)
+                YCMNI=RYCMF(N+MY_F)-LOCAL_POSF(I,2)
+                ZCMNI=RZCMF(N+MY_F)-LOCAL_POSF(I,3)
+                XCMMJ=RXCMF(M)-POSF(J,1)
+                YCMMJ=RYCMF(M)-POSF(J,2)
+                ZCMMJ=RZCMF(M)-POSF(J,3)
+                VIRIJXX=VIRIJXX+(RXIJ11+XCMNI-XCMMJ)*FXIJ11
+                VIRIJYY=VIRIJYY+(RYIJ11+YCMNI-YCMMJ)*FYIJ11
+                VIRIJZZ=VIRIJZZ+(RZIJ11+ZCMNI-ZCMMJ)*FZIJ11
+              ELSEIF(RIJ2IJ.GT.RLS2.AND.RIJ2IJ.LE.RUS2)THEN
+                RIJ2I=1.0D0/RIJ2IJ
+                RARITH=RSOL(I)+RSOL(J)
+                EGEOM=DSQRT(ESOL(I)*ESOL(J))
+                R2=RARITH*RARITH*RIJ2I
+                R6=R2*R2*R2
+                R12=R6*R6
+                ELJO=EGEOM*(R12-2.0D0*R6)
+                ZR=RIJ2IJ-RLS2
+                ZRSQ=ZR*ZR
+                ZRCQ=ZRSQ*ZR
+                ZRQQ=ZRCQ*ZR
+                ZRPQ=ZRQQ*ZR
+                SZR=1.D0+ASS*ZRCQ+BSS*ZRQQ+CSS*ZRPQ
+                DSZR=6.D0*ASS*ZRSQ+8.D0*BSS*ZRCQ+10.D0*CSS*ZRQQ
+                ELJ=ELJO*SZR
+                E04=E04+ELJ
+                COMFAC1=-12.0D0*EGEOM*(R12-R6)*RIJ2I
+                COMFAC2=ELJO*DSZR
+                COMFAC=-(COMFAC1*SZR+COMFAC2)
+                RIJ1=DSQRT(RIJ2IJ)
+                Q1=QF(I)*QF(J)
+                NINDX1=INT(RIJ1*RINCRI)
+                RN1=RINCR*NINDX1
+                FACT1=RIJ1-RN1
+                TERM1=Q1*(V(1,NINDX1)+FACT1*(V(2,NINDX1)+0.5D0*FACT1*
+     $                    V(3,NINDX1)))
+                TERM1A=Q1*(V(2,NINDX1)+FACT1*(V(3,NINDX1)+0.5D0*FACT1*
+     $                     V(4,NINDX1)))/RIJ1
+                TERM1AA=-(TERM1A*SZR+TERM1*DSZR)
+                FXIJ11=(COMFAC+TERM1AA)*RXIJ11
+                FYIJ11=(COMFAC+TERM1AA)*RYIJ11
+                FZIJ11=(COMFAC+TERM1AA)*RZIJ11
+                SUMQQ=SUMQQ+TERM1*SZR
+                FF(I,1)=FF(I,1)+FXIJ11
+                FF(I,2)=FF(I,2)+FYIJ11
+                FF(I,3)=FF(I,3)+FZIJ11
+                XCMNI=RXCMF(N+MY_F)-LOCAL_POSF(I,1)
+                YCMNI=RYCMF(N+MY_F)-LOCAL_POSF(I,2)
+                ZCMNI=RZCMF(N+MY_F)-LOCAL_POSF(I,3)
+                XCMMJ=RXCMF(M)-POSF(J,1)
+                YCMMJ=RYCMF(M)-POSF(J,2)
+                ZCMMJ=RZCMF(M)-POSF(J,3)
+                VIRIJXX=VIRIJXX+(RXIJ11+XCMNI-XCMMJ)*FXIJ11
+                VIRIJYY=VIRIJYY+(RYIJ11+YCMNI-YCMMJ)*FYIJ11
+                VIRIJZZ=VIRIJZZ+(RZIJ11+ZCMNI-ZCMMJ)*FZIJ11
+              END IF
+    8       CONTINUE
+    9     CONTINUE
+          EC4=EC4+SUMQQ
+          VIRLRXX=VIRLRXX+VIRIJXX
+          VIRLRYY=VIRLRYY+VIRIJYY
+          VIRLRZZ=VIRLRZZ+VIRIJZZ
+          END IF
+   10   CONTINUE
+   11 CONTINUE
+      E0=E0+E04
+      EC=EC+EC4
+      E0_S=E01+E02+E03
+      EC_S=EC1+EC2+EC3
+      VIRLJCR=VIRLRXX+VIRLRYY+VIRLRZZ
+      VIRLJCR_S=VIRLRXX_S+VIRLRYY_S+VIRLRZZ_S
+
+      CALL MPI_ALLREDUCE(FF_S,FF_SUM,NATOMS*3,MPI_DOUBLE_PRECISION,
+     $                   MPI_SUM,MPI_COMM_WORLD,IERR)
+
+      DO I=1,NFP_LOC
+        FF(I,1)=FF(I,1)+FF_SUM(I+MY_FATM,1)
+        FF(I,2)=FF(I,2)+FF_SUM(I+MY_FATM,2)
+        FF(I,3)=FF(I,3)+FF_SUM(I+MY_FATM,3)
+      END DO
+      RETURN
+      END
+
+      SUBROUTINE KWALD(X,Y,Z,FX,FY,FZ,POSF,FF,LOCAL_X,LOCAL_Y,LOCAL_Z,
+     $                 LOCAL_POSF,RXCM,RYCM,RZCM,RXCMF,RYCMF,RZCMF,
+     $                 BOXL,BOXLI,ALPHA,SIGMA,PI,A2,A22I,FACT,FACT2,
+     $                 FACTOR,VK,VS,VEX,VIRK,VIRM,KMAX,NATOM,NSITE,
+     $                 NATOMS,NRIGID,NSOL,NATSOL,NPERPR,NPERPF,NFP,
+     $                 NPERPR_LOC,NPERPF_LOC,NFP_LOC,RANK)     
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NATOMS,NRIGID,NSOL,NATSOL,KMAX,NKT
+      INTEGER NBOND,IBOND,JBOND,NANGLE,IANGLE,JANGLE,KANGLE
+      INTEGER NBON14,INBON14,JNBON14,NBON,INBON,JNBON,MY,MY_F,RANK
+      INTEGER I,J,K,IJ,IK,N,KX,KY,KZ,NK,KSQ,KSCUT,NPERPR,NPERPF,NFP
+      INTEGER NPERPR_LOC,NPERPF_LOC,NFP_LOC
+      DOUBLE PRECISION X,Y,Z,FX,FY,FZ,POSF,FF,BOXL,BOXLI,ALPHA,FACT
+      DOUBLE PRECISION FACT2,FACTOR,VK,ASPC,CSPC,RSPC,RSPC2,ESPC,Q,QF
+      DOUBLE PRECISION VECK,ARGX,ARGY,ARGZ,FCT,XK,YK,ZK,RFACT,VEX,VS
+      DOUBLE PRECISION PI,A2,A22I,RX1,RY1,RZ1,RIJ2,RIJ,TERM,SFACT
+      DOUBLE PRECISION FX1,FY1,FZ1,FXIK,FYIK,FZIK,RXCM,RYCM,RZCM
+      DOUBLE PRECISION RXCMF,RYCMF,RZCMF,FCB,R0,FCA,A0,RKSQ,RKSQI
+      DOUBLE PRECISION RSOL,ESOL,RWSOL,EWSOL,SCVDW14,SCELE14
+      DOUBLE PRECISION FXNI,FYNI,FZNI,VIRKXX,VIRKYY,VIRKZZ
+      DOUBLE PRECISION XP,YP,ZP,VIRMXX,VIRMYY,VIRMZZ,SIGMA
+      DOUBLE PRECISION VIRXX,VIRYY,VIRZZ,VIRK,VIRM
+      DOUBLE PRECISION LOCAL_X,LOCAL_Y,LOCAL_Z,LOCAL_POSF
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION FX(NATOM,NSITE),FY(NATOM,NSITE),FZ(NATOM,NSITE)
+      DIMENSION POSF(NATOMS,3),FF(NATOMS,3)
+      DIMENSION RXCM(NATOM),RYCM(NATOM),RZCM(NATOM),RXCMF(NSOL)
+      DIMENSION RYCMF(NSOL),RZCMF(NSOL)
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION LOCAL_POSF(NFP,3)
+      PARAMETER(NKT=2442)
+      COMPLEX*16 EIKX(NATOM,NSITE,-KMAX:KMAX)
+      COMPLEX*16 EIKY(NATOM,NSITE,-KMAX:KMAX)
+      COMPLEX*16 EIKZ(NATOM,NSITE,-KMAX:KMAX)
+      COMPLEX*16 EIKR(NATOM,NSITE),CFACT
+      COMPLEX*16 EIKF(NATOMS,3,-KMAX:KMAX),EIFKR(NATOMS)
+      COMPLEX*16 SUMK(NKT),SUMK_L(NKT),LFACT
+      COMMON/WATER/ASPC,CSPC,RSPC,RSPC2,ESPC,Q(1000,4)
+      COMMON/SOLUT/QF(1000)
+      COMMON/KVEC/VECK(10000)
+      PARAMETER(KSCUT=105)
+      COMMON/BOND/FCB(2000),R0(2000),NBOND,IBOND(2000),JBOND(2000)
+      COMMON/ANGLE/FCA(2000),A0(2000),NANGLE,IANGLE(2000),
+     $             JANGLE(2000),KANGLE(2000)
+      COMMON/FLEXI/RSOL(2000),ESOL(2000),RWSOL(2000),EWSOL(2000),
+     $             SCVDW14,SCELE14,NBON14,INBON14(2000),
+     $             JNBON14(2000),NBON,INBON(5000),JNBON(5000)
+    
+      INCLUDE 'mpif.h'
+      INTEGER IERR
+C
+C     This is the energy and derivatives in K-space
+C
+      VK=0.0D0
+      NK=0
+      VIRKXX=0.0D0
+      VIRKYY=0.0D0
+      VIRKZZ=0.0D0
+      VIRMXX=0.0D0
+      VIRMYY=0.0D0
+      VIRMZZ=0.0D0
+      MY=RANK*NPERPR
+      MY_F=RANK*NPERPF     
+C
+C     This is the energy and derivatives in K-space
+C
+      DO 2 I=1,NPERPR_LOC
+        DO 1 J=2,NSITE
+          EIKX(I,J,0)=DCMPLX(1.0D0,0.0D0)
+          EIKY(I,J,0)=DCMPLX(1.0D0,0.0D0)
+          EIKZ(I,J,0)=DCMPLX(1.0D0,0.0D0)
+          ARGX=FACT2*LOCAL_X(I,J)
+          ARGY=FACT2*LOCAL_Y(I,J)
+          ARGZ=FACT2*LOCAL_Z(I,J)
+          EIKX(I,J,1)=DCMPLX(DCOS(ARGX),DSIN(ARGX))
+          EIKY(I,J,1)=DCMPLX(DCOS(ARGY),DSIN(ARGY))
+          EIKZ(I,J,1)=DCMPLX(DCOS(ARGZ),DSIN(ARGZ))
+c          EIKX(I,J,-1)=DCONJG(EIKX(I,J,1))
+          EIKY(I,J,-1)=DCONJG(EIKY(I,J,1))
+          EIKZ(I,J,-1)=DCONJG(EIKZ(I,J,1))
+    1   CONTINUE
+    2 CONTINUE
+      DO 3 I=1,NFP_LOC
+        EIKF(I,1,0)=DCMPLX(1.0D0,0.0D0)
+        EIKF(I,2,0)=DCMPLX(1.0D0,0.0D0)
+        EIKF(I,3,0)=DCMPLX(1.0D0,0.0D0)
+        ARGX=FACT2*LOCAL_POSF(I,1)
+        ARGY=FACT2*LOCAL_POSF(I,2)
+        ARGZ=FACT2*LOCAL_POSF(I,3)
+        EIKF(I,1,1)=DCMPLX(DCOS(ARGX),DSIN(ARGX))
+        EIKF(I,2,1)=DCMPLX(DCOS(ARGY),DSIN(ARGY))
+        EIKF(I,3,1)=DCMPLX(DCOS(ARGZ),DSIN(ARGZ))
+c        EIKF(I,1,-1)=DCONJG(EIKF(I,1,1))
+        EIKF(I,2,-1)=DCONJG(EIKF(I,2,1))
+        EIKF(I,3,-1)=DCONJG(EIKF(I,3,1))
+    3 CONTINUE 
+      DO 7 KX=2,KMAX   
+        DO 5 K=2,NSITE
+          DO 4 I=1,NPERPR_LOC
+            EIKX(I,K,KX)=EIKX(I,K,KX-1)*EIKX(I,K,1)
+c            EIKX(I,K,-KX)=DCONJG(EIKX(I,K,KX))
+    4     CONTINUE
+    5   CONTINUE
+        DO 6 J=1,NFP_LOC
+            EIKF(J,1,KX)=EIKF(J,1,KX-1)*EIKF(J,1,1)
+c            EIKF(J,1,-KX)=DCONJG(EIKF(J,1,KX))
+    6   CONTINUE                 
+    7 CONTINUE   
+      DO 11 KY=2,KMAX
+        DO 9 K=2,NSITE
+          DO 8 I=1,NPERPR_LOC
+            EIKY(I,K,KY)=EIKY(I,K,KY-1)*EIKY(I,K,1)
+            EIKY(I,K,-KY)=DCONJG(EIKY(I,K,KY))
+    8     CONTINUE
+    9   CONTINUE
+        DO 10 J=1,NFP_LOC
+          EIKF(J,2,KY)=EIKF(J,2,KY-1)*EIKF(J,2,1)
+          EIKF(J,2,-KY)=DCONJG(EIKF(J,2,KY))
+   10   CONTINUE    
+   11 CONTINUE
+      DO 15 KZ=2,KMAX
+        DO 13 K=2,NSITE
+          DO 12 I=1,NPERPR_LOC
+            EIKZ(I,K,KZ)=EIKZ(I,K,KZ-1)*EIKZ(I,K,1)
+            EIKZ(I,K,-KZ)=DCONJG(EIKZ(I,K,KZ))
+   12     CONTINUE
+   13   CONTINUE
+        DO 14 J=1,NFP_LOC
+          EIKF(J,3,KZ)=EIKF(J,3,KZ-1)*EIKF(J,3,1)
+          EIKF(J,3,-KZ)=DCONJG(EIKF(J,3,KZ))
+   14   CONTINUE    
+   15 CONTINUE
+      DO 21 KX=0,KMAX
+        DO 20 KY=-KMAX,KMAX
+          DO 19 KZ=-KMAX,KMAX
+            KSQ=KX*KX+KY*KY+KZ*KZ
+            IF (KSQ.NE.0.AND.KSQ.LE.KSCUT) THEN
+              NK=NK+1
+              SUMK_L(NK)=DCMPLX(0.0D0,0.0D0)
+              DO 17 I=1,NPERPR_LOC
+                DO 16 K=2,NSITE
+                  EIKR(I,K)=EIKX(I,K,KX)*EIKY(I,K,KY)*EIKZ(I,K,KZ)
+                  SUMK_L(NK)=SUMK_L(NK)+DCMPLX(Q(I,K),0.0D0)*EIKR(I,K)
+   16           CONTINUE
+   17         CONTINUE
+              DO 18 J=1,NFP_LOC
+                EIFKR(J)=EIKF(J,1,KX)*EIKF(J,2,KY)*EIKF(J,3,KZ)
+                SUMK_L(NK)=SUMK_L(NK)+DCMPLX(QF(J),0.0D0)*EIFKR(J)
+   18         CONTINUE
+            END IF
+   19     CONTINUE
+   20   CONTINUE
+   21 CONTINUE
+
+      CALL MPI_ALLREDUCE(SUMK_L,SUMK,NKT,MPI_DOUBLE_COMPLEX,MPI_SUM,
+     $                   MPI_COMM_WORLD,IERR)
+      
+      NK=0
+      DO 28 KX=0,KMAX
+          IF(KX.EQ.0)THEN
+            FCT=1.0D0
+          ELSE
+            FCT=2.0D0
+          END IF
+        DO 27 KY=-KMAX,KMAX
+          DO 26 KZ=-KMAX,KMAX
+            KSQ=KX*KX+KY*KY+KZ*KZ
+            IF (KSQ.NE.0.AND.KSQ.LE.KSCUT) THEN
+              XK=DFLOAT(KX)*FACT2
+              YK=DFLOAT(KY)*FACT2
+              ZK=DFLOAT(KZ)*FACT2
+              RKSQ=XK*XK+YK*YK+ZK*ZK
+              RKSQI=1.0D0/RKSQ
+              NK=NK+1 
+              VK=VK+0.5D0*FCT*VECK(NK)*DCONJG(SUMK(NK))*SUMK(NK)
+              VIRKXX=VIRKXX+0.5D0*FCT*VECK(NK)*DCONJG(SUMK(NK))*
+     $                      SUMK(NK)*(1.0D0-(2.0D0*XK*XK)*RKSQI-
+     $                      XK*XK*A22I)
+              VIRKYY=VIRKYY+0.5D0*FCT*VECK(NK)*DCONJG(SUMK(NK))*
+     $                      SUMK(NK)*(1.0D0-(2.0D0*YK*YK)*RKSQI-
+     $                      YK*YK*A22I)
+              VIRKZZ=VIRKZZ+0.5D0*FCT*VECK(NK)*DCONJG(SUMK(NK))*
+     $                      SUMK(NK)*(1.0D0-(2.0D0*ZK*ZK)*RKSQI-
+     $                      ZK*ZK*A22I)
+              DO 23 I=1,NPERPR_LOC
+                DO 22 K=2,NSITE
+                  EIKR(I,K)=EIKX(I,K,KX)*EIKY(I,K,KY)*EIKZ(I,K,KZ)
+                  RFACT=-FCT*Q(I,K)*VECK(NK)
+                  LFACT=SUMK(NK)*DCONJG(EIKR(I,K))
+                  CFACT=DIMAG(LFACT)
+                  FXIK=RFACT*XK*CFACT
+                  FYIK=RFACT*YK*CFACT
+                  FZIK=RFACT*ZK*CFACT
+                  FX(I,K)=FX(I,K)+FXIK
+                  FY(I,K)=FY(I,K)+FYIK
+                  FZ(I,K)=FZ(I,K)+FZIK
+                  XP=LOCAL_X(I,K)-RXCM(I+MY)
+                  YP=LOCAL_Y(I,K)-RYCM(I+MY)
+                  ZP=LOCAL_Z(I,K)-RZCM(I+MY)
+                  VIRMXX=VIRMXX+XP*FXIK
+                  VIRMYY=VIRMYY+YP*FYIK
+                  VIRMZZ=VIRMZZ+ZP*FZIK
+   22           CONTINUE
+   23         CONTINUE
+            DO 25 N=1,NPERPF_LOC
+              DO 24 J=1,NATSOL
+                I=(N-1)*NATSOL+J
+                EIFKR(I)=EIKF(I,1,KX)*EIKF(I,2,KY)*EIKF(I,3,KZ)
+                RFACT=-FCT*QF(I)*VECK(NK)
+                CFACT=DIMAG(SUMK(NK)*DCONJG(EIFKR(I)))
+                FXNI=RFACT*XK*CFACT
+                FYNI=RFACT*YK*CFACT
+                FZNI=RFACT*ZK*CFACT
+                FF(I,1)=FF(I,1)+FXNI
+                FF(I,2)=FF(I,2)+FYNI
+                FF(I,3)=FF(I,3)+FZNI
+                XP=LOCAL_POSF(I,1)-RXCMF(N+MY_F)
+                YP=LOCAL_POSF(I,2)-RYCMF(N+MY_F)
+                ZP=LOCAL_POSF(I,3)-RZCMF(N+MY_F)
+                VIRMXX=VIRMXX+XP*FXNI
+                VIRMYY=VIRMYY+YP*FYNI
+                VIRMZZ=VIRMZZ+ZP*FZNI
+   24         CONTINUE
+   25       CONTINUE   
+            END IF
+   26     CONTINUE
+   27   CONTINUE
+   28 CONTINUE
+
+      VIRK=VIRKXX+VIRKYY+VIRKZZ
+      VIRM=VIRMXX+VIRMYY+VIRMZZ
+
+      VEX=0.0D0
+      VS=0.0D0
+      DO 31 J=2,NSITE
+        DO 30 K=2,NSITE
+          DO 29 I=1,NPERPR_LOC
+            IF (J.NE.K) THEN
+              RX1=LOCAL_X(I,J)-LOCAL_X(I,K)
+              RY1=LOCAL_Y(I,J)-LOCAL_Y(I,K)
+              RZ1=LOCAL_Z(I,J)-LOCAL_Z(I,K)
+              RIJ2=RX1*RX1+RY1*RY1+RZ1*RZ1
+              RIJ=DSQRT(RIJ2)
+              TERM=0.5D0*Q(I,J)*Q(I,K)
+              IF (RIJ.EQ.0.0D0)GO TO 29
+              VEX=VEX+TERM*DERF(ALPHA*RIJ)/RIJ
+            ELSE
+              VS=VS+FACT*Q(I,J)*Q(I,K)
+            END IF
+   29     CONTINUE
+   30   CONTINUE
+   31 CONTINUE
+        DO 32 IJ=1,NBOND
+          I=IBOND(IJ)
+          J=JBOND(IJ)
+          RX1=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+          RY1=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+          RZ1=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+          RIJ2=RX1*RX1+RY1*RY1+RZ1*RZ1
+          RIJ=DSQRT(RIJ2)
+          TERM=QF(I)*QF(J)
+          VEX=VEX+TERM*DERF(ALPHA*RIJ)/RIJ
+          SFACT=TERM*(FACTOR*ALPHA*DEXP(-A2*RIJ2)-
+     $                DERF(ALPHA*RIJ)/RIJ)/RIJ2
+          FX1=SFACT*RX1
+          FY1=SFACT*RY1
+          FZ1=SFACT*RZ1
+          FF(I,1)=FF(I,1)+FX1
+          FF(I,2)=FF(I,2)+FY1
+          FF(I,3)=FF(I,3)+FZ1
+          FF(J,1)=FF(J,1)-FX1
+          FF(J,2)=FF(J,2)-FY1
+          FF(J,3)=FF(J,3)-FZ1
+   32   CONTINUE    
+        DO 33 IK=1,NANGLE
+          I=IANGLE(IK)
+          K=KANGLE(IK)
+          RX1=LOCAL_POSF(I,1)-LOCAL_POSF(K,1)
+          RY1=LOCAL_POSF(I,2)-LOCAL_POSF(K,2)
+          RZ1=LOCAL_POSF(I,3)-LOCAL_POSF(K,3)
+          RIJ2=RX1*RX1+RY1*RY1+RZ1*RZ1
+          RIJ=DSQRT(RIJ2)
+          TERM=QF(I)*QF(K)
+          VEX=VEX+TERM*DERF(ALPHA*RIJ)/RIJ
+          SFACT=TERM*(FACTOR*ALPHA*DEXP(-A2*RIJ2)-
+     $                DERF(ALPHA*RIJ)/RIJ)/RIJ2
+          FX1=SFACT*RX1
+          FY1=SFACT*RY1
+          FZ1=SFACT*RZ1
+          FF(I,1)=FF(I,1)+FX1
+          FF(I,2)=FF(I,2)+FY1
+          FF(I,3)=FF(I,3)+FZ1
+          FF(K,1)=FF(K,1)-FX1
+          FF(K,2)=FF(K,2)-FY1
+          FF(K,3)=FF(K,3)-FZ1
+   33   CONTINUE
+        DO 34 IJ=1,NBON14
+          I=INBON14(IJ)
+          J=JNBON14(IJ)
+          RX1=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+          RY1=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+          RZ1=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+          RIJ2=RX1*RX1+RY1*RY1+RZ1*RZ1
+          RIJ=DSQRT(RIJ2)
+          TERM=(1.0D0-SCELE14)*QF(I)*QF(J)
+          VEX=VEX+TERM*DERF(ALPHA*RIJ)/RIJ
+          SFACT=TERM*(FACTOR*ALPHA*DEXP(-A2*RIJ2)-
+     $                DERF(ALPHA*RIJ)/RIJ)/RIJ2
+          FX1=SFACT*RX1
+          FY1=SFACT*RY1
+          FZ1=SFACT*RZ1
+          FF(I,1)=FF(I,1)+FX1
+          FF(I,2)=FF(I,2)+FY1
+          FF(I,3)=FF(I,3)+FZ1
+          FF(J,1)=FF(J,1)-FX1
+          FF(J,2)=FF(J,2)-FY1
+          FF(J,3)=FF(J,3)-FZ1
+   34   CONTINUE
+        DO 35 J=1,NFP_LOC
+          VS=VS+FACT*QF(J)*QF(J)
+   35   CONTINUE
+      RETURN
+      END 
+
+      SUBROUTINE PRIMDER(LOCAL_X,LOCAL_Y,LOCAL_Z,FX,FY,FZ,BOXL,BOXLI,
+     $                   NATOM,NSITE,NPRIM,NRIGID,NPERPR,NPERPR_LOC)
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NPRIM,NRIGID,I,NPERPR,NPERPR_LOC
+      DOUBLE PRECISION LOCAL_X,LOCAL_Y,LOCAL_Z,FX,FY,FZ,BOXL,BOXLI,RM
+      DOUBLE PRECISION XJK21,YJK21,ZJK21,XJK31,YJK31,ZJK31
+      DOUBLE PRECISION XB,YB,ZB,RB,GAMA,XJK41,YJK41,ZJK41
+      DOUBLE PRECISION RSQ41,FR41,FT,COMFX,COMFY,COMFZ
+      DOUBLE PRECISION FXO,FYO,FZO,FXH,FYH,FZH
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION FX(NATOM,NSITE),FY(NATOM,NSITE),FZ(NATOM,NSITE)
+      PARAMETER (RM=0.12500D0)
+C
+C     Massless fictitious sites simplify transferred force
+C     equations on real sites. Forces on fictitous sites (M-site)
+C     have been projected onto real sites.
+ 
+      DO 2 I=1,NPERPR_LOC
+        XJK21=LOCAL_X(I,2)-LOCAL_X(I,1)
+        YJK21=LOCAL_Y(I,2)-LOCAL_Y(I,1)
+        ZJK21=LOCAL_Z(I,2)-LOCAL_Z(I,1)
+        XJK31=LOCAL_X(I,3)-LOCAL_X(I,1)
+        YJK31=LOCAL_Y(I,3)-LOCAL_Y(I,1)
+        ZJK31=LOCAL_Z(I,3)-LOCAL_Z(I,1)
+        XB=0.5D0*(XJK21+XJK31)
+        YB=0.5D0*(YJK21+YJK31)
+        ZB=0.5D0*(ZJK21+ZJK31)
+        RB=DSQRT(XB*XB+YB*YB+ZB*ZB)
+        GAMA=RM/RB
+        XJK41=LOCAL_X(I,4)-LOCAL_X(I,1)
+        YJK41=LOCAL_Y(I,4)-LOCAL_Y(I,1)
+        ZJK41=LOCAL_Z(I,4)-LOCAL_Z(I,1)
+        RSQ41=XJK41*XJK41+YJK41*YJK41+ZJK41*ZJK41
+        FR41=XJK41*FX(I,4)+YJK41*FY(I,4)+ZJK41*FZ(I,4)
+        FT=FR41/RSQ41
+        COMFX=GAMA*(FX(I,4)-FT*XJK41)
+        COMFY=GAMA*(FY(I,4)-FT*YJK41)
+        COMFZ=GAMA*(FZ(I,4)-FT*ZJK41)
+        FXO=FX(I,4)-COMFX
+        FYO=FY(I,4)-COMFY
+        FZO=FZ(I,4)-COMFZ
+        FXH=0.5D0*COMFX
+        FYH=0.5D0*COMFY
+        FZH=0.5D0*COMFZ
+        FX(I,1)=FX(I,1)+FXO
+        FY(I,1)=FY(I,1)+FYO
+        FZ(I,1)=FZ(I,1)+FZO
+        FX(I,2)=FX(I,2)+FXH
+        FY(I,2)=FY(I,2)+FYH
+        FZ(I,2)=FZ(I,2)+FZH
+        FX(I,3)=FX(I,3)+FXH
+        FY(I,3)=FY(I,3)+FYH
+        FZ(I,3)=FZ(I,3)+FZH
+   2   CONTINUE   
+       RETURN
+       END
+   
+      SUBROUTINE RTMAT(RATTL,RTINV)
+      IMPLICIT NONE
+      DOUBLE PRECISION RATTL,RTINV,RTOL,DETERM
+      DIMENSION RATTL(3,3),RTINV(3,3)
+      PARAMETER(RTOL=1.0E-7)
+C
+C     GET ALL SIGNED COFACTORS, TRANSPOSE, AND PUT IN RTINV
+C
+      RTINV(1,1)=RATTL(2,2)*RATTL(3,3)-RATTL(2,3)*RATTL(3,2)
+      RTINV(1,2)=RATTL(1,3)*RATTL(3,2)-RATTL(1,2)*RATTL(3,3)
+      RTINV(1,3)=RATTL(1,2)*RATTL(2,3)-RATTL(1,3)*RATTL(2,2)
+      RTINV(2,1)=RATTL(2,3)*RATTL(3,1)-RATTL(2,1)*RATTL(3,3)
+      RTINV(2,2)=RATTL(1,1)*RATTL(3,3)-RATTL(1,3)*RATTL(3,1)
+      RTINV(2,3)=RATTL(1,3)*RATTL(2,1)-RATTL(1,1)*RATTL(2,3)
+      RTINV(3,1)=RATTL(2,1)*RATTL(3,2)-RATTL(2,2)*RATTL(3,1)
+      RTINV(3,2)=RATTL(1,2)*RATTL(3,1)-RATTL(1,1)*RATTL(3,2)
+      RTINV(3,3)=RATTL(1,1)*RATTL(2,2)-RATTL(1,2)*RATTL(2,1)
+C
+C     GET DETERMINANT AND GUARD AGAINST ZERO
+C
+      DETERM=RATTL(1,1)*RTINV(1,1)+RATTL(1,2)*RTINV(2,1)+
+     $       RATTL(1,3)*RTINV(3,1)
+      IF(DABS(DETERM).LT.RTOL)STOP'ZERO DETERM IN RMATINV'
+      RTINV(1,1)=RTINV(1,1)/DETERM
+      RTINV(1,2)=RTINV(1,2)/DETERM
+      RTINV(1,3)=RTINV(1,3)/DETERM
+      RTINV(2,1)=RTINV(2,1)/DETERM
+      RTINV(2,2)=RTINV(2,2)/DETERM
+      RTINV(2,3)=RTINV(2,3)/DETERM
+      RTINV(3,1)=RTINV(3,1)/DETERM
+      RTINV(3,2)=RTINV(3,2)/DETERM
+      RTINV(3,3)=RTINV(3,3)/DETERM
+      RETURN
+      END
+
+      SUBROUTINE SHMAT(SHAKE,SKINV)
+      IMPLICIT NONE
+      DOUBLE PRECISION SHAKE,SKINV,STOL,DETERM
+      DIMENSION SHAKE(3,3),SKINV(3,3)
+      PARAMETER(STOL=1.0E-7)
+C
+C     GET ALL SIGNED COFACTORS, TRANSPOSE, AND PUT IN SKINV
+C
+      SKINV(1,1)=SHAKE(2,2)*SHAKE(3,3)-SHAKE(2,3)*SHAKE(3,2)
+      SKINV(1,2)=SHAKE(1,3)*SHAKE(3,2)-SHAKE(1,2)*SHAKE(3,3)
+      SKINV(1,3)=SHAKE(1,2)*SHAKE(2,3)-SHAKE(1,3)*SHAKE(2,2)
+      SKINV(2,1)=SHAKE(2,3)*SHAKE(3,1)-SHAKE(2,1)*SHAKE(3,3)
+      SKINV(2,2)=SHAKE(1,1)*SHAKE(3,3)-SHAKE(1,3)*SHAKE(3,1)
+      SKINV(2,3)=SHAKE(1,3)*SHAKE(2,1)-SHAKE(1,1)*SHAKE(2,3)
+      SKINV(3,1)=SHAKE(2,1)*SHAKE(3,2)-SHAKE(2,2)*SHAKE(3,1)
+      SKINV(3,2)=SHAKE(1,2)*SHAKE(3,1)-SHAKE(1,1)*SHAKE(3,2)
+      SKINV(3,3)=SHAKE(1,1)*SHAKE(2,2)-SHAKE(1,2)*SHAKE(2,1)
+C
+C     GET DETERMINANT AND GUARD AGAINST ZERO
+C
+      DETERM=SHAKE(1,1)*SKINV(1,1)+SHAKE(1,2)*SKINV(2,1)+
+     $       SHAKE(1,3)*SKINV(3,1)
+      IF(DABS(DETERM).LT.STOL)STOP'ZERO DETERM IN SMATINV'
+      SKINV(1,1)=SKINV(1,1)/DETERM
+      SKINV(1,2)=SKINV(1,2)/DETERM
+      SKINV(1,3)=SKINV(1,3)/DETERM
+      SKINV(2,1)=SKINV(2,1)/DETERM
+      SKINV(2,2)=SKINV(2,2)/DETERM
+      SKINV(2,3)=SKINV(2,3)/DETERM
+      SKINV(3,1)=SKINV(3,1)/DETERM
+      SKINV(3,2)=SKINV(3,2)/DETERM
+      SKINV(3,3)=SKINV(3,3)/DETERM
+      RETURN
+      END
+
+      SUBROUTINE ZTMAT(ZMAT,ZINV)
+      IMPLICIT NONE
+      DOUBLE PRECISION ZMAT,ZINV,ZTOL,DETERM
+      DIMENSION ZMAT(3,3),ZINV(3,3)
+      PARAMETER(ZTOL=1.0E-7)
+C
+C     GET ALL SIGNED COFACTORS, TRANSPOSE, AND PUT IN ZINV
+C
+      ZINV(1,1)=ZMAT(2,2)*ZMAT(3,3)-ZMAT(2,3)*ZMAT(3,2)
+      ZINV(1,2)=ZMAT(1,3)*ZMAT(3,2)-ZMAT(1,2)*ZMAT(3,3)
+      ZINV(1,3)=ZMAT(1,2)*ZMAT(2,3)-ZMAT(1,3)*ZMAT(2,2)
+      ZINV(2,1)=ZMAT(2,3)*ZMAT(3,1)-ZMAT(2,1)*ZMAT(3,3)
+      ZINV(2,2)=ZMAT(1,1)*ZMAT(3,3)-ZMAT(1,3)*ZMAT(3,1)
+      ZINV(2,3)=ZMAT(1,3)*ZMAT(2,1)-ZMAT(1,1)*ZMAT(2,3)
+      ZINV(3,1)=ZMAT(2,1)*ZMAT(3,2)-ZMAT(2,2)*ZMAT(3,1)
+      ZINV(3,2)=ZMAT(1,2)*ZMAT(3,1)-ZMAT(1,1)*ZMAT(3,2)
+      ZINV(3,3)=ZMAT(1,1)*ZMAT(2,2)-ZMAT(1,2)*ZMAT(2,1)
+C
+C     GET DETERMINANT AND GUARD AGAINST ZERO
+C
+      DETERM=ZMAT(1,1)*ZINV(1,1)+ZMAT(1,2)*ZINV(2,1)+
+     $       ZMAT(1,3)*ZINV(3,1)
+      IF(DABS(DETERM).LT.ZTOL)STOP'ZERO DETERM IN ZMATINV'
+      ZINV(1,1)=ZINV(1,1)/DETERM
+      ZINV(1,2)=ZINV(1,2)/DETERM
+      ZINV(1,3)=ZINV(1,3)/DETERM
+      ZINV(2,1)=ZINV(2,1)/DETERM
+      ZINV(2,2)=ZINV(2,2)/DETERM
+      ZINV(2,3)=ZINV(2,3)/DETERM
+      ZINV(3,1)=ZINV(3,1)/DETERM
+      ZINV(3,2)=ZINV(3,2)/DETERM
+      ZINV(3,3)=ZINV(3,3)/DETERM
+      RETURN
+      END
+  
+      SUBROUTINE EINTERN(POSF,FF,LOCAL_POSF,BOXL,BOXLI,EINT,
+     $                   NATOMS,NSITE,NFP,RANK)
+      IMPLICIT NONE
+      INTEGER I,J,K,L,IJ,NATOMS,NSITE,NBOND,IBOND,JBOND,NANGLE
+      INTEGER IANGLE,JANGLE,KANGLE,NDIHE,IDIHE,JDIHE,KDIHE,LDIHE
+      INTEGER NP,NIMP,IIMP,JIMP,KIMP,LIMP,NFP,RANK
+      DOUBLE PRECISION POSF,FF,LOCAL_POSF,BOXL,BOXLI,EINT,FCB,R0,FCA
+      DOUBLE PRECISION A0,FCD,D0,FCP,P0,EBOND,DX,DY,DZ,RIJ,FFACT
+      DOUBLE PRECISION FX1,FY1,FZ1,EANGLE,DX1,DY1,DZ1,RIJ1,RIJ1I
+      DOUBLE PRECISION DX2,DY2,DZ2,RIJ2,RIJ2I,COSTHE,THETA,DRX1
+      DOUBLE PRECISION DRY1,DRZ1,DRX2,DRY2,DRZ2,EDIHE,DX3,DY3,DZ3
+      DOUBLE PRECISION AX,AY,AZ,RARA,RA,BX,BY,BZ,RBRB,RB,RAI,RBI
+      DOUBLE PRECISION AXRA,AYRA,AZRA,BXRB,BYRB,BZRB,COSPHI,PHI
+      DOUBLE PRECISION DX4,DY4,DZ4,S,RARB,DAXDYI,DAXDZI,DAYDXI
+      DOUBLE PRECISION DAYDZI,DAZDXI,DAZDYI,DAXDYJ,DAXDZJ,DAYDXJ
+      DOUBLE PRECISION DAYDZJ,DAZDXJ,DAZDYJ,DAXDYK,DAXDZK,DAYDXK
+      DOUBLE PRECISION DAYDZK,DAZDXK,DAZDYK,DBXDYJ,DBXDZJ,DBYDXJ
+      DOUBLE PRECISION DBYDZJ,DBZDXJ,DBZDYJ,DBXDYK,DBXDZK,DBYDXK
+      DOUBLE PRECISION DBYDZK,DBZDXK,DBZDYK,DBXDYL,DBXDZL,DBYDXL
+      DOUBLE PRECISION DBYDZL,DBZDXL,DBZDYL,DPHDXI,DPHDYI,DPHDZI
+      DOUBLE PRECISION DPHDXJ,DPHDYJ,DPHDZJ,DPHDXK,DPHDYK,DPHDZK
+      DOUBLE PRECISION DPHDXL,DPHDYL,DPHDZL,EIMPR
+      DIMENSION POSF(NATOMS,3),FF(NATOMS,3),LOCAL_POSF(NFP,3)
+      COMMON/BOND/FCB(2000),R0(2000),NBOND,IBOND(2000),JBOND(2000)
+      COMMON/ANGLE/FCA(2000),A0(2000),NANGLE,IANGLE(2000),
+     $             JANGLE(2000),KANGLE(2000)
+      COMMON/DIHE/FCD(2000),D0(2000),NDIHE,IDIHE(2000),JDIHE(2000),
+     $            KDIHE(2000),LDIHE(2000),NP(2000)
+      COMMON/IMPR/FCP(2000),P0(2000),NIMP,IIMP(2000),JIMP(2000),
+     $            KIMP(2000),LIMP(2000)
+C
+C     Evaluate bond energy
+C
+      EBOND=0.0D0
+      DO 1 IJ=1,NBOND
+        I=IBOND(IJ)
+        J=JBOND(IJ)
+        DX=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+        DY=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+        DZ=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+        RIJ=DSQRT(DX*DX+DY*DY+DZ*DZ)
+        EBOND=EBOND+FCB(IJ)*(RIJ-R0(IJ))*(RIJ-R0(IJ))
+        FFACT=-2.0D0*FCB(IJ)*(RIJ-R0(IJ))/RIJ
+        FX1=FFACT*DX
+        FY1=FFACT*DY
+        FZ1=FFACT*DZ
+        FF(I,1)=FF(I,1)+FX1
+        FF(I,2)=FF(I,2)+FY1
+        FF(I,3)=FF(I,3)+FZ1
+        FF(J,1)=FF(J,1)-FX1
+        FF(J,2)=FF(J,2)-FY1
+        FF(J,3)=FF(J,3)-FZ1
+    1 CONTINUE
+C
+C     Evaluate bond angle energy
+C
+      EANGLE=0.0D0
+      DO 2 IJ=1,NANGLE
+        I=IANGLE(IJ)
+        J=JANGLE(IJ)
+        K=KANGLE(IJ)
+        DX1=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+        DY1=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+        DZ1=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+        RIJ1=DSQRT(DX1*DX1+DY1*DY1+DZ1*DZ1)
+        RIJ1I=1.0D0/RIJ1
+        DX2=LOCAL_POSF(K,1)-LOCAL_POSF(J,1)
+        DY2=LOCAL_POSF(K,2)-LOCAL_POSF(J,2)
+        DZ2=LOCAL_POSF(K,3)-LOCAL_POSF(J,3)
+        RIJ2=DSQRT(DX2*DX2+DY2*DY2+DZ2*DZ2)
+        RIJ2I=1.0D0/RIJ2
+        COSTHE=(DX1*DX2+DY1*DY2+DZ1*DZ2)/(RIJ1*RIJ2)
+        IF (COSTHE.GT.1.0D0)COSTHE=1.0D0 
+        IF (COSTHE.LT.-1.0D0)COSTHE=-1.0D0 
+        THETA=DACOS(COSTHE)
+        EANGLE=EANGLE+FCA(IJ)*(THETA-A0(IJ))*(THETA-A0(IJ))
+        FFACT=2.0D0*FCA(IJ)*(THETA-A0(IJ))/DSIN(THETA)
+        DRX1=DX1*RIJ1I
+        DRY1=DY1*RIJ1I
+        DRZ1=DZ1*RIJ1I
+        DRX2=DX2*RIJ2I
+        DRY2=DY2*RIJ2I
+        DRZ2=DZ2*RIJ2I
+        FF(I,1)=FF(I,1)+FFACT*(DRX2-COSTHE*DRX1)*RIJ1I
+        FF(I,2)=FF(I,2)+FFACT*(DRY2-COSTHE*DRY1)*RIJ1I
+        FF(I,3)=FF(I,3)+FFACT*(DRZ2-COSTHE*DRZ1)*RIJ1I
+        FF(J,1)=FF(J,1)-FFACT*((DRX2-COSTHE*DRX1)*RIJ1I+
+     $                         (DRX1-COSTHE*DRX2)*RIJ2I)
+        FF(J,2)=FF(J,2)-FFACT*((DRY2-COSTHE*DRY1)*RIJ1I+
+     $                         (DRY1-COSTHE*DRY2)*RIJ2I)
+        FF(J,3)=FF(J,3)-FFACT*((DRZ2-COSTHE*DRZ1)*RIJ1I+
+     $                         (DRZ1-COSTHE*DRZ2)*RIJ2I)
+        FF(K,1)=FF(K,1)+FFACT*(DRX1-COSTHE*DRX2)*RIJ2I
+        FF(K,2)=FF(K,2)+FFACT*(DRY1-COSTHE*DRY2)*RIJ2I
+        FF(K,3)=FF(K,3)+FFACT*(DRZ1-COSTHE*DRZ2)*RIJ2I
+    2 CONTINUE
+C
+C     Evaluate dihedral angle energy
+C
+      EDIHE=0.0D0
+      DO 3 IJ=1,NDIHE
+        I=IDIHE(IJ)
+        J=JDIHE(IJ)
+        K=KDIHE(IJ)
+        L=LDIHE(IJ)
+        DX1=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+        DY1=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+        DZ1=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+        DX2=LOCAL_POSF(K,1)-LOCAL_POSF(J,1)
+        DY2=LOCAL_POSF(K,2)-LOCAL_POSF(J,2)
+        DZ2=LOCAL_POSF(K,3)-LOCAL_POSF(J,3)
+        DX3=LOCAL_POSF(K,1)-LOCAL_POSF(L,1)
+        DY3=LOCAL_POSF(K,2)-LOCAL_POSF(L,2)
+        DZ3=LOCAL_POSF(K,3)-LOCAL_POSF(L,3)
+        AX=DY1*DZ2-DZ1*DY2
+        AY=DZ1*DX2-DX1*DZ2
+        AZ=DX1*DY2-DY1*DX2
+        RARA=AX*AX+AY*AY+AZ*AZ
+        RA=DSQRT(RARA)
+        IF (RA.LE.0.1D0) THEN
+          WRITE(6,*)'Whoa! Dihedral',IJ,' is going linear!'
+          WRITE(6,*)'We will let you go this time, but derivatives will
+     $be affected!'
+          RA=0.1D0
+          RARA=RA*RA
+        END IF
+        BX=DY2*DZ3-DZ2*DY3
+        BY=DZ2*DX3-DX2*DZ3
+        BZ=DX2*DY3-DY2*DX3
+        RBRB=BX*BX+BY*BY+BZ*BZ
+        RB=DSQRT(RBRB)
+        IF (RB.LE.0.1D0) THEN
+          WRITE(6,*)'Whoa! Dihedral',IJ,' is going linear!'
+          WRITE(6,*)'We will let you go this time, but derivatives will
+     $be affected!'
+          RB=0.1D0
+          RBRB=RB*RB
+        END IF
+        RAI=1.0D0/RA
+        RBI=1.0D0/RB
+        AXRA=AX*RAI
+        AYRA=AY*RAI
+        AZRA=AZ*RAI
+        BXRB=BX*RBI
+        BYRB=BY*RBI
+        BZRB=BZ*RBI
+        COSPHI=AXRA*BXRB+AYRA*BYRB+AZRA*BZRB
+        IF (COSPHI.GT.1.0D0)COSPHI=1.0D0
+        IF (COSPHI.LT.-1.0D0)COSPHI=-1.0D0
+        PHI=DACOS(COSPHI)
+        DX4=AYRA*BZRB-AZRA*BYRB
+        DY4=AZRA*BXRB-AXRA*BZRB
+        DZ4=AXRA*BYRB-AYRA*BXRB
+        S=DX2*DX4+DY2*DY4+DZ2*DZ4
+        IF (PHI.LT.0.001D0)PHI=0.001D0
+        IF (S.LT.0.0D0)PHI=-PHI
+        EDIHE=EDIHE+FCD(IJ)*(1.0D0+DCOS(NP(IJ)*PHI-D0(IJ)))
+        FFACT=-FCD(IJ)*NP(IJ)*DSIN(NP(IJ)*PHI-D0(IJ))/DSIN(PHI)
+        RARB=RA*RB
+        RARA=1.0D0/RARA
+        RARB=1.0D0/RARB
+        RBRB=1.0D0/RBRB
+        DAXDYI=DZ2
+        DAXDZI=-DY2
+        DAYDXI=-DZ2
+        DAYDZI=DX2
+        DAZDXI=DY2
+        DAZDYI=-DX2
+        DAXDYJ=-DZ2+DZ1
+        DAXDZJ=-DY1+DY2
+        DAYDXJ=-DZ1+DZ2
+        DAYDZJ=-DX2+DX1
+        DAZDXJ=-DY2+DY1
+        DAZDYJ=-DX1+DX2
+        DAXDYK=-DZ1
+        DAXDZK=DY1
+        DAYDXK=DZ1
+        DAYDZK=-DX1
+        DAZDXK=-DY1
+        DAZDYK=DX1
+        DBXDYJ=-DZ3
+        DBXDZJ=DY3
+        DBYDXJ=DZ3
+        DBYDZJ=-DX3
+        DBZDXJ=-DY3
+        DBZDYJ=DX3
+        DBXDYK=DZ3-DZ2
+        DBXDZK=DY2-DY3
+        DBYDXK=DZ2-DZ3
+        DBYDZK=DX3-DX2
+        DBZDXK=DY3-DY2
+        DBZDYK=DX2-DX3
+        DBXDYL=DZ2
+        DBXDZL=-DY2
+        DBYDXL=-DZ2
+        DBYDZL=DX2
+        DBZDXL=DY2
+        DBZDYL=-DX2
+        DPHDXI=RARB*(BY*DAYDXI+BZ*DAZDXI)-COSPHI*(AY*DAYDXI+
+     $               AZ*DAZDXI)*RARA   
+        DPHDYI=RARB*(BX*DAXDYI+BZ*DAZDYI)-COSPHI*(AX*DAXDYI+
+     $               AZ*DAZDYI)*RARA   
+        DPHDZI=RARB*(BX*DAXDZI+BY*DAYDZI)-COSPHI*(AX*DAXDZI+
+     $               AY*DAYDZI)*RARA   
+        DPHDXJ=RARB*(AY*DBYDXJ+BY*DAYDXJ+AZ*DBZDXJ+BZ*DAZDXJ)-
+     $         COSPHI*((AY*DAYDXJ+AZ*DAZDXJ)*RARA+
+     $                 (BY*DBYDXJ+BZ*DBZDXJ)*RBRB)
+        DPHDYJ=RARB*(AX*DBXDYJ+BX*DAXDYJ+AZ*DBZDYJ+BZ*DAZDYJ)-
+     $         COSPHI*((BX*DBXDYJ+BZ*DBZDYJ)*RBRB+
+     $                 (AX*DAXDYJ+AZ*DAZDYJ)*RARA)
+        DPHDZJ=RARB*(AX*DBXDZJ+BX*DAXDZJ+AY*DBYDZJ+BY*DAYDZJ)-
+     $         COSPHI*((BX*DBXDZJ+BY*DBYDZJ)*RBRB+
+     $                 (AX*DAXDZJ+AY*DAYDZJ)*RARA) 
+        DPHDXK=RARB*(AY*DBYDXK+BY*DAYDXK+AZ*DBZDXK+BZ*DAZDXK)-
+     $         COSPHI*((AY*DAYDXK+AZ*DAZDXK)*RARA+
+     $                 (BY*DBYDXK+BZ*DBZDXK)*RBRB)   
+        DPHDYK=RARB*(AX*DBXDYK+BX*DAXDYK+AZ*DBZDYK+BZ*DAZDYK)-
+     $         COSPHI*((BX*DBXDYK+BZ*DBZDYK)*RBRB+
+     $                 (AX*DAXDYK+AZ*DAZDYK)*RARA)   
+        DPHDZK=RARB*(AX*DBXDZK+BX*DAXDZK+AY*DBYDZK+BY*DAYDZK)-
+     $         COSPHI*((BX*DBXDZK+BY*DBYDZK)*RBRB+
+     $                 (AX*DAXDZK+AY*DAYDZK)*RARA) 
+        DPHDXL=RARB*(AY*DBYDXL+AZ*DBZDXL)-COSPHI*(BY*DBYDXL+
+     $               BZ*DBZDXL)*RBRB  
+        DPHDYL=RARB*(AX*DBXDYL+AZ*DBZDYL)-COSPHI*(BX*DBXDYL+
+     $               BZ*DBZDYL)*RBRB   
+        DPHDZL=RARB*(AX*DBXDZL+AY*DBYDZL)-COSPHI*(BX*DBXDZL+
+     $               BY*DBYDZL)*RBRB   
+        FF(I,1)=FF(I,1)+FFACT*DPHDXI
+        FF(I,2)=FF(I,2)+FFACT*DPHDYI
+        FF(I,3)=FF(I,3)+FFACT*DPHDZI
+        FF(J,1)=FF(J,1)+FFACT*DPHDXJ
+        FF(J,2)=FF(J,2)+FFACT*DPHDYJ
+        FF(J,3)=FF(J,3)+FFACT*DPHDZJ
+        FF(K,1)=FF(K,1)+FFACT*DPHDXK
+        FF(K,2)=FF(K,2)+FFACT*DPHDYK
+        FF(K,3)=FF(K,3)+FFACT*DPHDZK
+        FF(L,1)=FF(L,1)+FFACT*DPHDXL
+        FF(L,2)=FF(L,2)+FFACT*DPHDYL
+        FF(L,3)=FF(L,3)+FFACT*DPHDZL
+    3 CONTINUE
+C
+C     Evaluate improper dihedral angle energy
+C
+      EIMPR=0.0D0
+      DO 4 IJ=1,NIMP
+        I=IIMP(IJ)
+        J=JIMP(IJ)
+        K=KIMP(IJ)
+        L=LIMP(IJ)
+        DX1=LOCAL_POSF(I,1)-LOCAL_POSF(J,1)
+        DY1=LOCAL_POSF(I,2)-LOCAL_POSF(J,2)
+        DZ1=LOCAL_POSF(I,3)-LOCAL_POSF(J,3)
+        DX2=LOCAL_POSF(K,1)-LOCAL_POSF(J,1)
+        DY2=LOCAL_POSF(K,2)-LOCAL_POSF(J,2)
+        DZ2=LOCAL_POSF(K,3)-LOCAL_POSF(J,3)
+        DX3=LOCAL_POSF(K,1)-LOCAL_POSF(L,1)
+        DY3=LOCAL_POSF(K,2)-LOCAL_POSF(L,2)
+        DZ3=LOCAL_POSF(K,3)-LOCAL_POSF(L,3)
+        AX=DY1*DZ2-DZ1*DY2
+        AY=DZ1*DX2-DX1*DZ2
+        AZ=DX1*DY2-DY1*DX2
+        RARA=AX*AX+AY*AY+AZ*AZ
+        RA=DSQRT(RARA)
+        BX=DY2*DZ3-DZ2*DY3
+        BY=DZ2*DX3-DX2*DZ3
+        BZ=DX2*DY3-DY2*DX3
+        RBRB=BX*BX+BY*BY+BZ*BZ
+        RB=DSQRT(RBRB)
+        RAI=1.0D0/RA
+        RBI=1.0D0/RB
+        AXRA=AX*RAI
+        AYRA=AY*RAI
+        AZRA=AZ*RAI
+        BXRB=BX*RBI
+        BYRB=BY*RBI
+        BZRB=BZ*RBI
+        COSPHI=AXRA*BXRB+AYRA*BYRB+AZRA*BZRB
+        IF (COSPHI.GT.1.0D0)COSPHI=1.0D0
+        IF (COSPHI.LT.-1.0D0)COSPHI=-1.0D0
+        PHI=DACOS(COSPHI)
+        EIMPR=EIMPR+0.5D0*FCP(IJ)*(PHI-P0(IJ))*(PHI-P0(IJ))
+        FFACT=FCP(IJ)*(PHI-P0(IJ))
+        RARB=RA*RB
+        RARA=1.0D0/RARA
+        RARB=1.0D0/RARB
+        RBRB=1.0D0/RBRB
+        DAXDYI=DZ2
+        DAXDZI=-DY2
+        DAYDXI=-DZ2
+        DAYDZI=DX2
+        DAZDXI=DY2
+        DAZDYI=-DX2
+        DAXDYJ=-DZ2+DZ1
+        DAXDZJ=-DY1+DY2
+        DAYDXJ=-DZ1+DZ2
+        DAYDZJ=-DX2+DX1
+        DAZDXJ=-DY2+DY1
+        DAZDYJ=-DX1+DX2
+        DAXDYK=-DZ1
+        DAXDZK=DY1
+        DAYDXK=DZ1
+        DAYDZK=-DX1
+        DAZDXK=-DY1
+        DAZDYK=DX1
+        DBXDYJ=-DZ3
+        DBXDZJ=DY3
+        DBYDXJ=DZ3
+        DBYDZJ=-DX3
+        DBZDXJ=-DY3
+        DBZDYJ=DX3
+        DBXDYK=DZ3-DZ2
+        DBXDZK=DY2-DY3
+        DBYDXK=DZ2-DZ3
+        DBYDZK=DX3-DX2
+        DBZDXK=DY3-DY2
+        DBZDYK=DX2-DX3
+        DBXDYL=DZ2
+        DBXDZL=-DY2
+        DBYDXL=-DZ2
+        DBYDZL=DX2
+        DBZDXL=DY2
+        DBZDYL=-DX2
+        DPHDXI=RARB*(BY*DAYDXI+BZ*DAZDXI)-COSPHI*(AY*DAYDXI+
+     $               AZ*DAZDXI)*RARA   
+        DPHDYI=RARB*(BX*DAXDYI+BZ*DAZDYI)-COSPHI*(AX*DAXDYI+
+     $               AZ*DAZDYI)*RARA   
+        DPHDZI=RARB*(BX*DAXDZI+BY*DAYDZI)-COSPHI*(AX*DAXDZI+
+     $               AY*DAYDZI)*RARA   
+        DPHDXJ=RARB*(AY*DBYDXJ+BY*DAYDXJ+AZ*DBZDXJ+BZ*DAZDXJ)-
+     $         COSPHI*((AY*DAYDXJ+AZ*DAZDXJ)*RARA+
+     $                 (BY*DBYDXJ+BZ*DBZDXJ)*RBRB)
+        DPHDYJ=RARB*(AX*DBXDYJ+BX*DAXDYJ+AZ*DBZDYJ+BZ*DAZDYJ)-
+     $         COSPHI*((BX*DBXDYJ+BZ*DBZDYJ)*RBRB+
+     $                 (AX*DAXDYJ+AZ*DAZDYJ)*RARA)
+        DPHDZJ=RARB*(AX*DBXDZJ+BX*DAXDZJ+AY*DBYDZJ+BY*DAYDZJ)-
+     $         COSPHI*((BX*DBXDZJ+BY*DBYDZJ)*RBRB+
+     $                 (AX*DAXDZJ+AY*DAYDZJ)*RARA) 
+        DPHDXK=RARB*(AY*DBYDXK+BY*DAYDXK+AZ*DBZDXK+BZ*DAZDXK)-
+     $         COSPHI*((AY*DAYDXK+AZ*DAZDXK)*RARA+
+     $                 (BY*DBYDXK+BZ*DBZDXK)*RBRB)   
+        DPHDYK=RARB*(AX*DBXDYK+BX*DAXDYK+AZ*DBZDYK+BZ*DAZDYK)-
+     $         COSPHI*((BX*DBXDYK+BZ*DBZDYK)*RBRB+
+     $                 (AX*DAXDYK+AZ*DAZDYK)*RARA)   
+        DPHDZK=RARB*(AX*DBXDZK+BX*DAXDZK+AY*DBYDZK+BY*DAYDZK)-
+     $         COSPHI*((BX*DBXDZK+BY*DBYDZK)*RBRB+
+     $                 (AX*DAXDZK+AY*DAYDZK)*RARA) 
+        DPHDXL=RARB*(AY*DBYDXL+AZ*DBZDXL)-COSPHI*(BY*DBYDXL+
+     $               BZ*DBZDXL)*RBRB  
+        DPHDYL=RARB*(AX*DBXDYL+AZ*DBZDYL)-COSPHI*(BX*DBXDYL+
+     $               BZ*DBZDYL)*RBRB   
+        DPHDZL=RARB*(AX*DBXDZL+AY*DBYDZL)-COSPHI*(BX*DBXDZL+
+     $               BY*DBYDZL)*RBRB   
+        FF(I,1)=FF(I,1)+FFACT*DPHDXI
+        FF(I,2)=FF(I,2)+FFACT*DPHDYI
+        FF(I,3)=FF(I,3)+FFACT*DPHDZI
+        FF(J,1)=FF(J,1)+FFACT*DPHDXJ
+        FF(J,2)=FF(J,2)+FFACT*DPHDYJ
+        FF(J,3)=FF(J,3)+FFACT*DPHDZJ
+        FF(K,1)=FF(K,1)+FFACT*DPHDXK
+        FF(K,2)=FF(K,2)+FFACT*DPHDYK
+        FF(K,3)=FF(K,3)+FFACT*DPHDZK
+        FF(L,1)=FF(L,1)+FFACT*DPHDXL
+        FF(L,2)=FF(L,2)+FFACT*DPHDYL
+        FF(L,3)=FF(L,3)+FFACT*DPHDZL
+    4 CONTINUE
+C
+C     Return internal energy
+C
+      EINT=EBOND+EANGLE+EDIHE+EIMPR
+      RETURN
+      END
+
+      SUBROUTINE SOLOMIT(X,Y,Z,VX,VY,VZ,POSF,BOXL,BOXLI,EOMIT,NATOM,
+     $                   NSITE,NRIGID,NFLEX,NATOMS,NSOL,NATSOL)
+C
+C     This is the energy and derivatives in real space
+C     
+      IMPLICIT NONE
+      INTEGER NATOM,NSITE,NRIGID,NFLEX,NATOMS,NSOL,NATSOL
+      INTEGER NBON14,INBON14,JNBON14,NBON,INBON,JNBON
+      INTEGER I,J,K,IPOINT,NCUT
+      DOUBLE PRECISION X,Y,Z,VX,VY,VZ,POSF,BOXL,BOXLI,EOMIT,RSOL
+      DOUBLE PRECISION ESOL,RWSOL,EWSOL,SCVDW14
+      DOUBLE PRECISION SCELE14,ASPC,CSPC,RSPC,RSPC2,ESPC,Q,QF
+      DOUBLE PRECISION RX1,RY1,RZ1,RIJ1,RIJ2IJ,RIJ2I,RARITH,EGEOM
+      DOUBLE PRECISION R2,R6,R12,ELJ,COMFAC,Q1,TERM1,TERM1A
+      DOUBLE PRECISION RX2,RY2,RZ2,RIJ2,Q2,TERM2,TERM2A
+      DOUBLE PRECISION RX3,RY3,RZ3,RIJ3,Q3,TERM3,TERM3A,E0
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION VX(NATOM,3),VY(NATOM,3),VZ(NATOM,3)
+      DIMENSION POSF(NATOMS,3)
+      COMMON/FLEXI/RSOL(2000),ESOL(2000),RWSOL(2000),EWSOL(2000),
+     $             SCVDW14,SCELE14,NBON14,INBON14(2000),
+     $             JNBON14(2000),NBON,INBON(5000),JNBON(5000)
+      COMMON/WATER/ASPC,CSPC,RSPC,RSPC2,ESPC,Q(1000,4)
+      COMMON/SOLUT/QF(1000)
+      DIMENSION IPOINT(2000)
+C
+C     Do solvent-solute interactions
+C     
+      NCUT=0
+      DO 4 J=1,NATOMS
+        DO 3 I=1,NRIGID
+          RX1=X(I,1)-POSF(J,1)
+          RY1=Y(I,1)-POSF(J,2)
+          RZ1=Z(I,1)-POSF(J,3)
+          RX1=RX1-BOXL*DNINT(RX1*BOXLI)
+          RY1=RY1-BOXL*DNINT(RY1*BOXLI)
+          RZ1=RZ1-BOXL*DNINT(RZ1*BOXLI)
+          RIJ2IJ=RX1*RX1+RY1*RY1+RZ1*RZ1
+          RIJ2I=1.0D0/RIJ2IJ
+          RARITH=(RSPC+RSOL(J))
+          EGEOM=DSQRT(ESPC*ESOL(J))
+          R2=RARITH*RARITH/RIJ2IJ
+          R6=R2*R2*R2
+          R12=R6*R6
+          ELJ=EGEOM*(R12-2.0D0*R6)
+          COMFAC=-12.0D0*EGEOM*(R12-R6)*RIJ2I
+          RIJ1=DSQRT(RIJ2IJ)
+          Q1=Q(I,1)*QF(J)
+          TERM1=Q1/RIJ1
+          TERM1A=-Q1/(RIJ1*RIJ1*RIJ1)
+          RX2=X(I,2)-POSF(J,1)
+          RY2=Y(I,2)-POSF(J,2)
+          RZ2=Z(I,2)-POSF(J,3)
+          RX2=RX2-BOXL*DNINT(RX2*BOXLI)
+          RY2=RY2-BOXL*DNINT(RY2*BOXLI)
+          RZ2=RZ2-BOXL*DNINT(RZ2*BOXLI)
+          RIJ2=DSQRT(RX2*RX2+RY2*RY2+RZ2*RZ2)
+          Q2=Q(I,2)*QF(J)
+          TERM2=Q2/RIJ2
+          TERM2A=-Q2/(RIJ2*RIJ2*RIJ2)
+          RX3=X(I,3)-POSF(J,1)
+          RY3=Y(I,3)-POSF(J,2)
+          RZ3=Z(I,3)-POSF(J,3)
+          RX3=RX3-BOXL*DNINT(RX3*BOXLI)
+          RY3=RY3-BOXL*DNINT(RY3*BOXLI)
+          RZ3=RZ3-BOXL*DNINT(RZ3*BOXLI)
+          RIJ3=DSQRT(RX3*RX3+RY3*RY3+RZ3*RZ3)
+          Q3=Q(I,3)*QF(J)
+          TERM3=Q3/RIJ3
+          TERM3A=-Q3/(RIJ3*RIJ3*RIJ3)
+          E0=ELJ+TERM1+TERM2+TERM3
+          IF (E0.GT.EOMIT) THEN
+            DO 2 K=1,NCUT
+              IF (I.EQ.IPOINT(K))GO TO 3
+    2       CONTINUE
+            NCUT=NCUT+1
+            IPOINT(NCUT)=I
+          END IF
+    3   CONTINUE
+    4 CONTINUE
+      WRITE(6,*)NCUT
+      DO 7 I=1,NRIGID
+        DO 5 J=1,NCUT
+          IF (I.EQ.IPOINT(J))GO TO 7
+    5   CONTINUE
+        DO 6 J=1,3
+          WRITE(6,*)X(I,J),Y(I,J),Z(I,J)
+          WRITE(6,*)VX(I,J),VY(I,J),VZ(I,J)
+    6   CONTINUE
+    7 CONTINUE
+      STOP
+      RETURN
+      END
+
+      SUBROUTINE LRCLJ(AS,BS,CS,ASPC,CSPC,RUPPER,RLOWER,
+     $                 ELRC,PLRC,NRIGID)
+      IMPLICIT NONE
+      INTEGER NRIGID
+      DOUBLE PRECISION AS,BS,CS,ASPC,CSPC,RUPPER,RLOWER,PI
+      DOUBLE PRECISION RUI,RLI,RUI2,RUI3,RUI4,RUI5,RUI6,RUI7,RUI8
+      DOUBLE PRECISION RUI9,RLI2,RLI3,RLI4,RLI5,RLI6,RLI7,RLI8,RLI9
+      DOUBLE PRECISION RU2,RU3,RU4,RU5,RU6,RU7,RU8,RU9,RU10
+      DOUBLE PRECISION RL2,RL3,RL4,RL5,RL6,RL7,RL8,RL9,RL10
+      DOUBLE PRECISION C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12
+      DOUBLE PRECISION C13,C14,C15,C16,C17,C18,C19,C20
+      DOUBLE PRECISION TERM1,TERM2,TERM3,TERM1P,TERM2P,TERM3P
+      DOUBLE PRECISION TERM4P,TERM5P,TERM6P,PLJSWF1,PLJSWF2,PF
+      DOUBLE PRECISION ELJSWF,ELJTAIL,PLJSWF,PLJTAIL,ELRC,PLRC
+C
+C     Evaluate the long range correction for the LJ interaction 
+C     energy and pressure. 
+C
+       PI=DACOS(-1.0D0)
+       PF=2.0D0*PI*NRIGID*NRIGID
+       RUI=1.0D0/RUPPER
+       RLI=1.0D0/RLOWER
+       RUI2=RUI*RUI
+       RUI3=RUI2*RUI
+       RUI4=RUI3*RUI
+       RUI5=RUI4*RUI
+       RUI6=RUI5*RUI
+       RUI7=RUI6*RUI
+       RUI8=RUI7*RUI
+       RUI9=RUI8*RUI
+       RLI2=RLI*RLI
+       RLI3=RLI2*RLI
+       RLI4=RLI3*RLI
+       RLI5=RLI4*RLI
+       RLI6=RLI5*RLI
+       RLI7=RLI6*RLI
+       RLI8=RLI7*RLI
+       RLI9=RLI8*RLI
+       RU2=RUPPER*RUPPER
+       RU3=RU2*RUPPER
+       RU4=RU3*RUPPER
+       RU5=RU4*RUPPER
+       RU6=RU5*RUPPER
+       RU7=RU6*RUPPER
+       RU8=RU7*RUPPER
+       RU9=RU8*RUPPER
+       RU10=RU9*RUPPER
+       RL2=RLOWER*RLOWER
+       RL3=RL2*RLOWER
+       RL4=RL3*RLOWER
+       RL5=RL4*RLOWER
+       RL6=RL5*RLOWER
+       RL7=RL6*RLOWER
+       RL8=RL7*RLOWER
+       RL9=RL8*RLOWER
+       RL10=RL9*RLOWER
+       C1=1.0D0/3.0D0
+       C2=3.0D0/5.0D0
+       C3=3.0D0/7.0D0
+       C4=C1*C1
+       C5=16.0D0*C1
+       C6=4.0D0*C1
+       C7=2.0D0*C2
+       C8=4.0D0/7.0D0
+       C9=C2/3.0D0
+       C10=10.0D0*C1
+       C11=(5.0D0/3.0D0)*C3
+       C12=C3/3.0D0
+       C13=12.0D0*C2
+       C14=12.0D0*C3
+       C15=2.0D0*C13
+       C16=12.0D0*C8
+       C17=20.0D0*C3
+       C18=2.0D0*C3
+       C19=(2.0D0/3.0D0)*C2
+       C20=2.0D0*C19
+C
+       TERM1=-AS*(ASPC*(-C1*(RUI3-RLI3)+C2*RL2*(RUI5-RLI5)-
+     $            C3*RL4*(RUI7-RLI7)+C4*RL6*(RUI9-RLI9))+
+     $            CSPC*(-C1*(RU3-RL3)+3.0D0*RL2*(RUPPER-RLOWER)+
+     $            3.0D0*RL4*(RUI-RLI)-C1*RL6*(RUI3-RLI3)))
+C
+       TERM2=-BS*(ASPC*(-(RUI-RLI)+C6*RL2*(RUI3-RLI3)-
+     $            C7*RL4*(RUI5-RLI5)+C8*RL6*(RUI7-RLI7)-
+     $            C4*RL8*(RUI9-RLI9))+CSPC*(-C9*(RU5-RL5)+
+     $            C6*RL2*(RU3-RL3)-6.0D0*RL4*(RUPPER-RLOWER)-
+     $            4.0D0*RL6*(RUI-RLI)+C1*RL8*(RUI3-RLI3)))
+C
+       TERM3=-CS*(ASPC*(RUPPER-RLOWER+5.0D0*RL2*(RUI-RLI)-
+     $            C10*RL4*(RUI3-RLI3)+2.0D0*RL6*(RUI5-RLI5)-
+     $            C11*RL8*(RUI7-RLI7)+C4*RL10*(RUI9-RLI9))+
+     $            CSPC*(-C12*(RU7-RL7)+RL2*(RU5-RL5)-
+     $            C10*RL4*(RU3-RL3)+10.0D0*RL6*(RUPPER-RLOWER)+
+     $            5.0D0*RL8*(RUI-RLI)-C1*RL10*(RUI3-RLI3)))
+C
+       ELJSWF=PF*(TERM1+TERM2+TERM3)
+       ELJTAIL=PF*(C4*ASPC*RUI9-C1*CSPC*RUI3)
+       ELRC=ELJSWF+ELJTAIL
+C
+       TERM1P=-AS*(ASPC*(4.0D0*(RUI3-RLI3)-C13*RL2*(RUI5-RLI5)+
+     $             C14*RL4*(RUI7-RLI7)-C6*RL6*(RUI9-RLI9))+
+     $             CSPC*(2.0D0*(RU3-RL3)-18.0D0*RL2*(RUPPER-RLOWER)-
+     $             18.0D0*RL4*(RUI-RLI)+2.0D0*RL6*(RUI3-RLI3)))
+C
+       TERM2P=-BS*(ASPC*(12.0D0*(RUI-RLI)-16.0D0*RL2*(RUI3-RLI3)+
+     $             C15*RL4*(RUI5-RLI5)-C16*RL6*(RUI7-RLI7)+
+     $             C6*RL8*(RUI9-RLI9))+
+     $             CSPC*(C7*(RU5-RL5)-8.0D0*RL2*(RU3-RL3)+
+     $             36.0D0*RL4*(RUPPER-RLOWER)+24.0D0*RL6*(RUI-RLI)-
+     $             2.0D0*RL8*(RUI3-RLI3)))
+C
+       TERM3P=-CS*(ASPC*(-12.0D0*(RUPPER-RLOWER)-
+     $             60.0D0*RL2*(RUI-RLI)+40.0D0*RL4*(RUI3-RLI3)-
+     $             24.0D0*RL6*(RUI5-RLI5)+C17*RL8*(RUI7-RLI7)-
+     $             C6*RL10*(RUI9-RLI9))+
+     $             CSPC*(C18*(RU7-RL7)-6.0D0*RL2*(RU5-RL5)+
+     $             20.0D0*RL4*(RU3-RL3)-60.0D0*RL6*(RUPPER-RLOWER)-
+     $             30.0D0*RL8*(RUI-RLI)+2.0D0*RL10*(RUI3-RLI3)))
+C
+       TERM4P=-6.0D0*AS*(ASPC*(-C1*(RUI3-RLI3)+C19*RL2*(RUI5-RLI5)-
+     $                   C12*RL4*(RUI7-RLI7))+CSPC*(-C1*(RU3-RL3)+
+     $                   2.0D0*RL2*(RUPPER-RLOWER)+RL4*(RUI-RLI)))
+C
+       TERM5P=-8.0D0*BS*(ASPC*(-(RUI-RLI)+RL2*(RUI3-RLI3)-
+     $                   C2*RL4*(RUI5-RLI5)+C12*RL6*(RUI7-RLI7))+
+     $                   CSPC*(-C9*(RU5-RL5)+RL2*(RU3-RL3)-
+     $                   3.0D0*RL4*(RUPPER-RLOWER)-RL6*(RUI-RLI)))
+C
+       TERM6P=-10.0D0*CS*(ASPC*(RUPPER-RLOWER+4.0D0*RL2*(RUI-RLI)-
+     $                    2.0D0*RL4*(RUI3-RLI3)+C20*RL6*(RUI5-RLI5)-
+     $                    C12*RL8*(RUI7-RLI7))+CSPC*(-C12*(RU7-RL7)+
+     $                    C20*RL2*(RU5-RL5)-2.0D0*RL4*(RU3-RL3)+
+     $                    4.0D0*RL6*(RUPPER-RLOWER)+RL8*(RUI-RLI)))
+C
+       PLJSWF1=-PF*(TERM1P+TERM2P+TERM3P)
+       PLJSWF2=-PF*(TERM4P+TERM5P+TERM6P)
+       PLJSWF=PLJSWF1+PLJSWF2
+       PLJTAIL=-C6*ASPC*RUI9+2.0D0*CSPC*RUI3
+       PLJTAIL=-PF*PLJTAIL
+       PLRC=PLJSWF+PLJTAIL 
+      RETURN
+      END
+
+
+      SUBROUTINE SCATTER_D(X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z,SCATTERBUF,
+     $                     SCATTERLOCAL,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $                     NPERPR_LOC,NPERPR,NATOM,NSITE,PROCS)
+      IMPLICIT NONE
+      INTEGER NPERPR_LOC,NATOM,NSITE,I,J,DOUBLE_QUAD,IERR,WATER_LOCAL
+      INTEGER PROCS,DISP,NPERPR
+      DOUBLE PRECISION X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z,SCATTERBUF
+      DOUBLE PRECISION SCATTERLOCAL
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION SCATTERBUF(NSITE,3,NATOM),SCATTERLOCAL(NSITE,3,NPERPR)
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+
+      INCLUDE 'mpif.h'
+
+      DO J=1,NSITE
+         DO I=1,NATOM
+            SCATTERBUF(J,1,I)=X(I,J)
+            SCATTERBUF(J,2,I)=Y(I,J)
+            SCATTERBUF(J,3,I)=Z(I,J)
+         END DO
+      END DO
+
+      CALL MPI_SCATTERV(SCATTERBUF,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $                  SCATTERLOCAL,NPERPR_LOC,DOUBLE_QUAD,0,
+     $                  MPI_COMM_WORLD,IERR)  
+   
+      DO J=1,NSITE
+         DO I=1,NPERPR_LOC
+            LOCAL_X(I,J)=SCATTERLOCAL(J,1,I)
+            LOCAL_Y(I,J)=SCATTERLOCAL(J,2,I)
+            LOCAL_Z(I,J)=SCATTERLOCAL(J,3,I)
+         END DO
+      END DO
+      RETURN
+      END 
+
+
+      SUBROUTINE SCATTER(X,LOCAL_X,SCATTERBUF,SCATTERLOCAL,WATER_LOCAL,
+     $                   DISP,DOUBLE_QUAD,NPERPR_LOC,NPERPR,NATOM,NSITE,
+     $                   PROCS)
+      IMPLICIT NONE
+      INTEGER NPERPR_LOC,NATOM,NSITE,I,J,DOUBLE_QUAD,IERR,WATER_LOCAL
+      INTEGER PROCS,DISP,NPERPR
+      DOUBLE PRECISION X,LOCAL_X,SCATTERBUF,SCATTERLOCAL
+      DIMENSION X(NATOM,NSITE),LOCAL_X(NPERPR,NSITE)
+      DIMENSION SCATTERBUF(NSITE,NATOM),SCATTERLOCAL(NSITE,NPERPR)
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+
+      INCLUDE 'mpif.h'
+
+      DO J=1,NSITE
+         DO I=1,NATOM
+            SCATTERBUF(J,I)=X(I,J)
+         END DO
+      END DO
+
+      CALL MPI_SCATTERV(SCATTERBUF,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $                  SCATTERLOCAL,NPERPR_LOC,DOUBLE_QUAD,0,
+     $                  MPI_COMM_WORLD,IERR)  
+   
+      DO J=1,NSITE
+         DO I=1,NPERPR_LOC
+            LOCAL_X(I,J)=SCATTERLOCAL(J,I)
+         END DO
+      END DO
+      RETURN
+      END 
+
+      SUBROUTINE GATHER_D(X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z,SCATTERBUF,
+     $                    SCATTERLOCAL,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $                    NPERPR_LOC,NPERPR,NATOM,NSITE,PROCS)
+      IMPLICIT NONE
+      INTEGER NPERPR,NATOM,NSITE,I,J,DOUBLE_QUAD,IERR
+      INTEGER WATER_LOCAL,DISP,NPERPR_LOC,PROCS
+      DOUBLE PRECISION X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z
+      DOUBLE PRECISION SCATTERBUF,SCATTERLOCAL
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION SCATTERBUF(NSITE,3,NATOM),SCATTERLOCAL(NSITE,3,NPERPR)
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+
+      INCLUDE 'mpif.h'
+
+      DO J=1,NSITE
+         DO I=1,NPERPR_LOC
+            SCATTERLOCAL(J,1,I)=LOCAL_X(I,J)
+            SCATTERLOCAL(J,2,I)=LOCAL_Y(I,J)
+            SCATTERLOCAL(J,3,I)=LOCAL_Z(I,J)
+         END DO
+      END DO
+
+      CALL MPI_ALLGATHERV(SCATTERLOCAL,NPERPR_LOC,DOUBLE_QUAD,
+     $                    SCATTERBUF,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $                    MPI_COMM_WORLD,IERR) 
+ 
+      DO J=1,NSITE
+         DO I=1,NATOM
+            X(I,J)=SCATTERBUF(J,1,I)
+            Y(I,J)=SCATTERBUF(J,2,I)
+            Z(I,J)=SCATTERBUF(J,3,I)
+         END DO
+      END DO   
+      RETURN
+      END
+
+      SUBROUTINE GATHER(X,LOCAL_X,SCATTERBUF,SCATTERLOCAL,WATER_LOCAL,
+     $                  DISP,DOUBLE_QUAD,NPERPR_LOC,NPERPR,NATOM,NSITE,
+     $                  PROCS)
+      IMPLICIT NONE
+      INTEGER NPERPR,NATOM,NSITE,I,J,DOUBLE_QUAD,IERR
+      INTEGER WATER_LOCAL,DISP,NPERPR_LOC,PROCS
+      DOUBLE PRECISION X,LOCAL_X,SCATTERBUF,SCATTERLOCAL
+      DIMENSION X(NATOM,NSITE),LOCAL_X(NPERPR,NSITE)
+      DIMENSION SCATTERBUF(NSITE,NATOM),SCATTERLOCAL(NSITE,NPERPR)
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+
+      INCLUDE 'mpif.h'
+
+      DO J=1,NSITE
+         DO I=1,NPERPR_LOC
+            SCATTERLOCAL(J,I)=LOCAL_X(I,J)
+         END DO
+      END DO
+
+      CALL MPI_ALLGATHERV(SCATTERLOCAL,NPERPR_LOC,DOUBLE_QUAD,
+     $                    SCATTERBUF,WATER_LOCAL,DISP,DOUBLE_QUAD,
+     $                    MPI_COMM_WORLD,IERR) 
+ 
+      DO J=1,NSITE
+         DO I=1,NATOM
+            X(I,J)=SCATTERBUF(J,I)
+         END DO
+      END DO   
+      RETURN
+      END
+
+      SUBROUTINE GATHERL_D(X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z,SCATTERBUF,
+     $                     SCATTERLOCAL,DOUBLE_QUAD,NPERPR,NPERPR_LOC,
+     $                     WATER_LOCAL,DISP,NATOM,NSITE,PROCS)
+      IMPLICIT NONE
+      INTEGER NPERPR,NATOM,NSITE,I,J,DOUBLE_QUAD,IERR
+      INTEGER NPERPR_LOC,WATER_LOCAL,DISP,PROCS
+      DOUBLE PRECISION X,Y,Z,LOCAL_X,LOCAL_Y,LOCAL_Z
+      DOUBLE PRECISION SCATTERBUF,SCATTERLOCAL
+      DIMENSION X(NATOM,NSITE),Y(NATOM,NSITE),Z(NATOM,NSITE)
+      DIMENSION LOCAL_X(NPERPR,NSITE),LOCAL_Y(NPERPR,NSITE)
+      DIMENSION LOCAL_Z(NPERPR,NSITE)
+      DIMENSION SCATTERBUF(NSITE,3,NATOM),SCATTERLOCAL(NSITE,3,NPERPR)
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+
+      INCLUDE 'mpif.h'
+
+      DO J=1,NSITE
+         DO I=1,NPERPR_LOC
+            SCATTERLOCAL(J,1,I)=LOCAL_X(I,J)
+            SCATTERLOCAL(J,2,I)=LOCAL_Y(I,J)
+            SCATTERLOCAL(J,3,I)=LOCAL_Z(I,J)
+         END DO
+      END DO
+
+      CALL MPI_GATHERV(SCATTERLOCAL,NPERPR_LOC,DOUBLE_QUAD,SCATTERBUF,
+     $                 WATER_LOCAL,DISP,DOUBLE_QUAD,0,MPI_COMM_WORLD,
+     $                 IERR) 
+ 
+      DO J=1,NSITE
+         DO I=1,NATOM
+            X(I,J)=SCATTERBUF(J,1,I)
+            Y(I,J)=SCATTERBUF(J,2,I)
+            Z(I,J)=SCATTERBUF(J,3,I)
+         END DO
+      END DO   
+      RETURN
+      END
+
+
+      SUBROUTINE GATHERL(X,LOCAL_X,SCATTERBUF,SCATTERLOCAL,DOUBLE_QUAD,
+     $                   NPERPR,NPERPR_LOC,WATER_LOCAL,DISP,NATOM,NSITE,
+     $                   PROCS)
+      IMPLICIT NONE
+      INTEGER NPERPR,NATOM,NSITE,I,J,DOUBLE_QUAD,IERR
+      INTEGER NPERPR_LOC,WATER_LOCAL,DISP,PROCS
+      DOUBLE PRECISION X,LOCAL_X,SCATTERBUF,SCATTERLOCAL
+      DIMENSION X(NATOM,NSITE),LOCAL_X(NPERPR,NSITE)
+      DIMENSION SCATTERBUF(NSITE,NATOM),SCATTERLOCAL(NSITE,NPERPR)
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+
+      INCLUDE 'mpif.h'
+
+      DO J=1,NSITE
+         DO I=1,NPERPR_LOC
+            SCATTERLOCAL(J,I)=LOCAL_X(I,J)
+         END DO
+      END DO
+
+      CALL MPI_GATHERV(SCATTERLOCAL,NPERPR_LOC,DOUBLE_QUAD,SCATTERBUF,
+     $                 WATER_LOCAL,DISP,DOUBLE_QUAD,0,MPI_COMM_WORLD,
+     $                 IERR) 
+ 
+      DO J=1,NSITE
+         DO I=1,NATOM
+            X(I,J)=SCATTERBUF(J,I)
+         END DO
+      END DO   
+      RETURN
+      END
+      
+      SUBROUTINE SPLIT_WATER(NRIGID,WATER_LOCAL,DISP,PROCS,NPERPR_LOC,
+     $                       RANK)
+      IMPLICIT NONE
+      INTEGER NRIGID,WATER_LOCAL,DISP,PROCS,RANK,IERR
+      INTEGER I,IDX,NUM,NPER,NPERPR_LOC
+      DIMENSION WATER_LOCAL(PROCS),DISP(PROCS+1)
+      
+      NPER=(NRIGID+PROCS-2)/PROCS
+
+      IDX=0
+      NUM=NPER
+      DO I=1,PROCS
+        IF(IDX+NUM.GT.NRIGID) NUM=NRIGID-IDX
+        WATER_LOCAL(I)=NUM
+        DISP(I)=IDX
+        IDX=IDX+NUM
+      END DO
+      NPERPR_LOC=WATER_LOCAL(RANK+1)
+      DISP(PROCS+1)=IDX
+      RETURN
+      END
+
+      SUBROUTINE SPLIT_SOLUTE(NSOL,SOLUTE_LOCAL,SOL_DISP,PROCS,
+     $                        NPERPF_LOC,NATSOL,NFP_LOC,RANK)
+      IMPLICIT NONE
+      INTEGER NSOL,SOLUTE_LOCAL,SOL_DISP,PROCS,RANK,IERR
+      INTEGER I,IDX,NUM,NPER,NPERPF_LOC,NFP_LOC,NATSOL
+      DIMENSION SOLUTE_LOCAL(PROCS),SOL_DISP(PROCS+1)
+      
+      NPER=(NSOL+PROCS-2)/PROCS
+
+      IDX=0
+      NUM=NPER
+      DO I=1,PROCS
+        IF(IDX+NUM.GT.NSOL) NUM=NSOL-IDX
+        SOLUTE_LOCAL(I)=NUM
+        SOL_DISP(I)=IDX
+        IDX=IDX+NUM
+      END DO
+      NPERPF_LOC=SOLUTE_LOCAL(RANK+1)
+      DO I=1,PROCS
+      SOLUTE_LOCAL(I)=SOLUTE_LOCAL(I)*NATSOL
+      SOL_DISP(I)=SOL_DISP(I)*NATSOL
+      END DO
+      SOL_DISP(PROCS+1)=IDX*NATSOL
+      NFP_LOC=NPERPF_LOC*NATSOL
+      RETURN
+      END      
+
+
+ 

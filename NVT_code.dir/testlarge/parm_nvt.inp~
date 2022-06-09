@@ -1,0 +1,29 @@
+2     #Tsteps
+0	#T Equilibrate
+0	#T velocity rescale
+.001    #dt
+260.5	#Temperature
+1728	#Number molecul
+.999    #Density g/cm^3
+3	#Atoms per molecule
+1	#Equil flag 1=yes
+1E-10	#tolerance
+3	#nconst
+9.0	#R_LOWER
+9.5	#R_UPPER
+3.16435	#RSPC
+0.162750	#ESPC
+0.52422	#Q2
+0.52422	#Q3
+-1.04844	#Q4	
+37.269	#old boxlength
+40   #fs isave
+500 #fs statwrite
+50000 #fs allsave
+100	#num saves perfile
+5 #num thermostats
+5 #num converges	
+5 #num evolution expansions
+0.0 0.0 0.0 0.0 0.0 #therm pos and vel
+0.0 0.0 0.0 0.0 0.0
+0.5 #time scale therm

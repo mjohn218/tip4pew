@@ -1,0 +1,25 @@
+
+1. Set line 29 	
+to the value of N/procs, for 512 molecules on 16 processors 
+the value is 32
+	#define nperp 32
+
+2. Check library for mpi
+MAC G5: <mpicxx.h>
+AMD Opteron: <mpi++.h>
+IBM SP: "mpi.h"
+
+
+3. Check MPI compiler in Makefile
+MAC G5: mpic++
+AMD Opteron: mpicxx
+IBM SP: mpCC -cpp
+
+
+4. Adjust Parameters in parmfile.inp to desired Temp, density, time steps, etc
+
+5. Check first line of coordinate file is #molecules
+ Coordinate read in as 
+Oxygen (x,y,z)
+Hydrogen (x,y,z)
+Hydrogen (x,y,z)	

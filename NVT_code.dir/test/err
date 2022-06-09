@@ -1,0 +1,160 @@
+mpic++ -O3 -Wall  -o Tip4p_NVT Tip4p_NVT.cpp Ensemble.o   -lm
+In file included from Tip4p_NVT.cpp:25:
+Ensemble.h:6:24: Parameters.h: No such file or directory
+In file included from Tip4p_NVT.cpp:25:
+Ensemble.h:86: error: type specifier omitted for parameter `Constants'
+Ensemble.h:86: error: parse error before `&' token
+Ensemble.h:87: error: type specifier omitted for parameter `Constants'
+Ensemble.h:87: error: parse error before `&' token
+Ensemble.h:92: error: type specifier omitted for parameter `Constants'
+Ensemble.h:92: error: parse error before `,' token
+Ensemble.h:93: error: type specifier omitted for parameter `Constants'
+Ensemble.h:93: error: parse error before `,' token
+Ensemble.h:94: error: type specifier omitted for parameter `Constants'
+Ensemble.h:94: error: parse error before `,' token
+Ensemble.h:95: error: type specifier omitted for parameter `Constants'
+Ensemble.h:95: error: parse error before `,' token
+Ensemble.h:96: error: type specifier omitted for parameter `Constants'
+Ensemble.h:96: error: parse error before `,' token
+Ensemble.h:97: error: type specifier omitted for parameter `Constants'
+Ensemble.h:97: error: parse error before `,' token
+Ensemble.h:98: error: `Parameters' was not declared in this scope
+Ensemble.h:98: error: parse error before `,' token
+Ensemble.h:99: error: type specifier omitted for parameter `Constants'
+Ensemble.h:99: error: parse error before `,' token
+Ensemble.h:102: error: `Parameters' was not declared in this scope
+Ensemble.h:102: error: `parms' was not declared in this scope
+Ensemble.h:102: error: `Constants' was not declared in this scope
+Ensemble.h:102: error: `cons' was not declared in this scope
+Ensemble.h:102: error: `Averages' was not declared in this scope
+Ensemble.h:102: error: `avg' was not declared in this scope
+Ensemble.h:102: error: parse error before `&' token
+Ensemble.h:103: error: `Parameters' was not declared in this scope
+Ensemble.h:103: error: `parms' was not declared in this scope
+Ensemble.h:103: error: `Constants' was not declared in this scope
+Ensemble.h:103: error: parse error before `,' token
+Ensemble.h:108: error: `Thermostat' was not declared in this scope
+Ensemble.h:108: error: `therm' was not declared in this scope
+Ensemble.h:108: error: `Constants' was not declared in this scope
+Ensemble.h:108: error: parse error before `)' token
+Ensemble.h:109: error: type specifier omitted for parameter `Constants'
+Ensemble.h:109: error: parse error before `,' token
+Ensemble.h:110: error: `Constants' was not declared in this scope
+Ensemble.h:110: error: parse error before `,' token
+Ensemble.h:111: error: `Constants' was not declared in this scope
+Ensemble.h:111: error: parse error before `,' token
+Ensemble.h:112: error: `Constants' was not declared in this scope
+Ensemble.h:112: error: parse error before `,' token
+Ensemble.h:114: error: `Constants' was not declared in this scope
+Ensemble.h:114: error: parse error before `,' token
+Ensemble.h:116: error: `Constants' was not declared in this scope
+Ensemble.h:116: error: parse error before `,' token
+Ensemble.h:117: error: `Constants' was not declared in this scope
+Ensemble.h:117: error: parse error before `,' token
+Ensemble.h:118: error: `Constants' was not declared in this scope
+Ensemble.h:118: error: parse error before `,' token
+Ensemble.h:119: error: `Constants' was not declared in this scope
+Ensemble.h:119: error: parse error before `,' token
+Ensemble.h:121: error: `Constants' was not declared in this scope
+Ensemble.h:121: error: parse error before `,' token
+Ensemble.h:122: error: `Constants' was not declared in this scope
+Ensemble.h:122: error: parse error before `,' token
+Ensemble.h:123: error: type specifier omitted for parameter `Constants'
+Ensemble.h:123: error: parse error before `,' token
+Tip4p_NVT.cpp:27:24: Parameters.h: No such file or directory
+Tip4p_NVT.cpp:41: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:41: error: parse error before `,' token
+Tip4p_NVT.cpp:43: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:43: error: parse error before `,' token
+Tip4p_NVT.cpp:45: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:45: error: parse error before `,' token
+Tip4p_NVT.cpp:47: error: `Constants' was not declared in this scope
+Tip4p_NVT.cpp:47: error: `cons' was not declared in this scope
+Tip4p_NVT.cpp:47: error: variable or field `Ksetup1' declared void
+Tip4p_NVT.cpp:48: error: `Constants' was not declared in this scope
+Tip4p_NVT.cpp:48: error: parse error before `,' token
+Tip4p_NVT.cpp:49: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:49: error: parse error before `,' token
+Tip4p_NVT.cpp:50: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:50: error: parse error before `,' token
+Tip4p_NVT.cpp:51: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:51: error: parse error before `,' token
+Tip4p_NVT.cpp: In function `int main(int, char**)':
+Tip4p_NVT.cpp:73: error: `Thermostat' undeclared (first use this function)
+Tip4p_NVT.cpp:73: error: (Each undeclared identifier is reported only once for 
+   each function it appears in.)
+Tip4p_NVT.cpp:73: error: parse error before `;' token
+Tip4p_NVT.cpp:74: error: `Parameters' undeclared (first use this function)
+Tip4p_NVT.cpp:75: error: `Constants' undeclared (first use this function)
+Tip4p_NVT.cpp:76: error: `Averages' undeclared (first use this function)
+Tip4p_NVT.cpp:116: error: `cons' undeclared (first use this function)
+Tip4p_NVT.cpp:116: error: `parms' undeclared (first use this function)
+Tip4p_NVT.cpp:116: error: `th' undeclared (first use this function)
+Tip4p_NVT.cpp:154: error: `a' undeclared (first use this function)
+Tip4p_NVT.cpp:198: error: `j' undeclared (first use this function)
+Tip4p_NVT.cpp:208: error: `Ksetup1' cannot be used as a function
+Tip4p_NVT.cpp: At global scope:
+Tip4p_NVT.cpp:525: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:525: error: parse error before `,' token
+Tip4p_NVT.cpp: In function `void NVTintegrateMotion(...)':
+Tip4p_NVT.cpp:533: error: `NVT' undeclared (first use this function)
+Tip4p_NVT.cpp:537: error: `vel' undeclared (first use this function)
+Tip4p_NVT.cpp:542: error: `force' undeclared (first use this function)
+Tip4p_NVT.cpp:561: error: `local_mols' undeclared (first use this function)
+Tip4p_NVT.cpp:561: error: `myopos' undeclared (first use this function)
+Tip4p_NVT.cpp:561: error: `Mat' undeclared (first use this function)
+Tip4p_NVT.cpp:561: error: `Minv' undeclared (first use this function)
+Tip4p_NVT.cpp:567: error: `Watertype' undeclared (first use this function)
+Tip4p_NVT.cpp:567: error: `mols' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `Kreal' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `Kimag' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `SKreal' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `SKimag' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `kxyz' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `com' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `terf' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `Veck' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `xr' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `xi' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `yr' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `yi' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `zr' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `zi' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `ekr' undeclared (first use this function)
+Tip4p_NVT.cpp:572: error: `eki' undeclared (first use this function)
+Tip4p_NVT.cpp: At global scope:
+Tip4p_NVT.cpp:611: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:611: error: parse error before `,' token
+Tip4p_NVT.cpp: In function `void mcalcEForce(...)':
+Tip4p_NVT.cpp:648: error: `NNN' undeclared (first use this function)
+Tip4p_NVT.cpp: At global scope:
+Tip4p_NVT.cpp:695: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:695: error: parse error before `,' token
+Tip4p_NVT.cpp:967: error: variable or field `Ksetup1' declared void
+Tip4p_NVT.cpp:967: error: redefinition of `int Ksetup1'
+Tip4p_NVT.cpp:47: error: `int Ksetup1' previously defined here
+Tip4p_NVT.cpp:967: error: syntax error before `{' token
+Tip4p_NVT.cpp:975: error: parse error before `for'
+Tip4p_NVT.cpp:975: error: parse error before `;' token
+Tip4p_NVT.cpp:975: error: syntax error before `++' token
+Tip4p_NVT.cpp:977: error: parse error before `;' token
+Tip4p_NVT.cpp:977: error: syntax error before `++' token
+Tip4p_NVT.cpp:979: error: parse error before `;' token
+Tip4p_NVT.cpp:979: error: syntax error before `++' token
+Tip4p_NVT.cpp:993: error: syntax error before `.' token
+Tip4p_NVT.cpp:994: error: syntax error before `<<' token
+Tip4p_NVT.cpp:997: error: parse error before `,' token
+Tip4p_NVT.cpp: In function `void Ksetup2(...)':
+Tip4p_NVT.cpp:1048: error: `Vself' undeclared (first use this function)
+Tip4p_NVT.cpp: At global scope:
+Tip4p_NVT.cpp:1054: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:1054: error: parse error before `,' token
+Tip4p_NVT.cpp: In function `void ComputeEnergyInit(...)':
+Tip4p_NVT.cpp:1078: error: `Efinish' undeclared (first use this function)
+Tip4p_NVT.cpp: At global scope:
+Tip4p_NVT.cpp:1123: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:1123: error: parse error before `,' token
+Tip4p_NVT.cpp:1182: error: type specifier omitted for parameter `Constants'
+Tip4p_NVT.cpp:1182: error: parse error before `,' token
+mpic++: No such file or directory
+make: *** [Tip4p_NVT] Error 1

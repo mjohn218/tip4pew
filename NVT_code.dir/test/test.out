@@ -1,0 +1,49 @@
+NperP: 256
+NperP: 256
+defined nperp for kspace class: 256
+defined nperp for kspace class: 256
+ N molecules: 512
+ N molecules: 512
+in initial: rho: 0.9954
+in initial: rho: 0.9954
+MOLECULE Density: 0.0332742
+MOLECULE Density: 0.0332742
+BOXLENGTH: 24.8726
+BOXLENGTH: 24.8726
+VOLUME 15387.3
+VOLUME 15387.3
+ no boxlength scaling of initial config. 
+ no boxlength scaling of initial config. 
+Size of K vector: 2442
+Vself; 55355.775583
+Size of K vector: 2442
+Vself; 55355.775583
+Initializing Vel from Maxwell Boltzman. 298
+Initializing Vel from Maxwell Boltzman. 298
+ZERO....
+-2.34198229711e-15 1
+ZERO....
+-8.85896719365e-16 0
+Einitial: 0
+
+MUST CREATE DIRECTORIES TO SAVE CONFIGS INSIDE!!
+ Name them: DiffP and PbcP 
+ Number of configs saved per file: 100
+Equilibrating.. for: 0 steps.
+E0 996.06983552 EC 0 VK 44.5835212865 Vex -54646.1552821 Vs 55355.775583 VKall -665.036779606
+ EPOT: 331.033055914 EKIN 453.911656623 ELRCint -29.4395040883
+ Etotal :755.505208448
+
+RealVir: 23289.008308 KVirial -38.1651705354
+InstTemp: 298
+ Pint 35088.2635509
+Einitial: 755.505208448
+
+MUST CREATE DIRECTORIES TO SAVE CONFIGS INSIDE!!
+ Name them: DiffP and PbcP 
+ Number of configs saved per file: 100
+Equilibrating.. for: 0 steps.
+ Done equilibrating..Collect statistics & trajectories
+done. 
+ Done equilibrating..Collect statistics & trajectories
+done. 

@@ -1,0 +1,257 @@
+g++    -c -o Ensemble.o Ensemble.cpp
+In file included from Ensemble.cpp:7:
+Ensemble.h:6:24: Parameters.h: No such file or directory
+In file included from Ensemble.cpp:7:
+Ensemble.h:69: error: type specifier omitted for parameter `Constants'
+Ensemble.h:69: error: parse error before `&' token
+Ensemble.h:74: error: type specifier omitted for parameter `Constants'
+Ensemble.h:74: error: parse error before `)' token
+Ensemble.h:75: error: type specifier omitted for parameter `Constants'
+Ensemble.h:75: error: parse error before `)' token
+Ensemble.h:76: error: type specifier omitted for parameter `Constants'
+Ensemble.h:76: error: parse error before `,' token
+Ensemble.h:77: error: type specifier omitted for parameter `Constants'
+Ensemble.h:77: error: parse error before `,' token
+Ensemble.h:78: error: type specifier omitted for parameter `Constants'
+Ensemble.h:78: error: parse error before `,' token
+Ensemble.h:79: error: type specifier omitted for parameter `Constants'
+Ensemble.h:79: error: parse error before `)' token
+Ensemble.h:80: error: `Parameters' was not declared in this scope
+Ensemble.h:80: error: parse error before `,' token
+Ensemble.h:81: error: type specifier omitted for parameter `Constants'
+Ensemble.h:81: error: parse error before `,' token
+Ensemble.h:84: error: `Parameters' was not declared in this scope
+Ensemble.h:84: error: `parms' was not declared in this scope
+Ensemble.h:84: error: `Constants' was not declared in this scope
+Ensemble.h:84: error: `cons' was not declared in this scope
+Ensemble.h:84: error: `Averages' was not declared in this scope
+Ensemble.h:84: error: `avg' was not declared in this scope
+Ensemble.h:84: error: invalid data member initialization
+Ensemble.h:84: error: (use `=' to initialize static data members)
+Ensemble.h:84: error: variable or field `InitialParms' declared void
+Ensemble.h:85: error: `Parameters' was not declared in this scope
+Ensemble.h:85: error: `parms' was not declared in this scope
+Ensemble.h:85: error: `Constants' was not declared in this scope
+Ensemble.h:85: error: parse error before `,' token
+Ensemble.h:87: error: type specifier omitted for parameter `Constants'
+Ensemble.h:87: error: parse error before `,' token
+Ensemble.h:94: error: type specifier omitted for parameter `Constants'
+Ensemble.h:94: error: parse error before `,' token
+Ensemble.h:95: error: type specifier omitted for parameter `Constants'
+Ensemble.h:95: error: parse error before `,' token
+Ensemble.h:96: error: `Constants' was not declared in this scope
+Ensemble.h:96: error: parse error before `)' token
+Ensemble.h:97: error: `Constants' was not declared in this scope
+Ensemble.h:97: error: parse error before `)' token
+Ensemble.h:98: error: type specifier omitted for parameter `Constants'
+Ensemble.h:98: error: parse error before `,' token
+Ensemble.h:99: error: `Constants' was not declared in this scope
+Ensemble.h:99: error: parse error before `,' token
+Ensemble.h:100: error: `Constants' was not declared in this scope
+Ensemble.h:100: error: parse error before `,' token
+Ensemble.h:101: error: `Constants' was not declared in this scope
+Ensemble.h:101: error: parse error before `,' token
+Ensemble.h:103: error: `Constants' was not declared in this scope
+Ensemble.h:103: error: parse error before `,' token
+Ensemble.h:104: error: `Constants' was not declared in this scope
+Ensemble.h:104: error: parse error before `,' token
+Ensemble.h:105: error: `Constants' was not declared in this scope
+Ensemble.h:105: error: parse error before `,' token
+Ensemble.h:106: error: `Constants' was not declared in this scope
+Ensemble.h:106: error: parse error before `,' token
+Ensemble.h:108: error: `Constants' was not declared in this scope
+Ensemble.h:108: error: parse error before `,' token
+Ensemble.h:109: error: `Constants' was not declared in this scope
+Ensemble.h:109: error: parse error before `,' token
+Ensemble.cpp:11:24: Parameters.h: No such file or directory
+Ensemble.cpp:62: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:62: error: parse error before `&' token
+Ensemble.cpp: In member function `void Ensemble::readParms(...)':
+Ensemble.cpp:66: error: `filename' undeclared (first use this function)
+Ensemble.cpp:66: error: (Each undeclared identifier is reported only once for 
+   each function it appears in.)
+Ensemble.cpp:66: error: variable `std::ifstream PARMFILE' has initializer but 
+   incomplete type
+Ensemble.cpp:69: error: `cons' undeclared (first use this function)
+Ensemble.cpp:77: error: `parms' undeclared (first use this function)
+Ensemble.cpp: In member function `void Ensemble::readCoords(char*, WaterSend*)
+   ':
+Ensemble.cpp:112: error: variable `std::ifstream COORDFILE' has initializer but 
+   incomplete type
+Ensemble.cpp: In member function `void Ensemble::readVelocity(char*, 
+   WaterSend*)':
+Ensemble.cpp:131: error: variable `std::ifstream VELFILE' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:145: error: `Parameters' was not declared in this scope
+Ensemble.cpp:145: error: `Constants' was not declared in this scope
+Ensemble.cpp:145: error: `Averages' was not declared in this scope
+Ensemble.cpp:145: error: `avg' was not declared in this scope
+Ensemble.cpp:146: error: variable or field `InitialParms' declared void
+Ensemble.cpp:146: error: `int Ensemble::InitialParms' is not a static member of 
+   `class Ensemble'
+Ensemble.cpp:146: error: initializer list being treated as compound expression
+Ensemble.cpp:146: error: syntax error before `{' token
+Ensemble.cpp:158: error: syntax error before `.' token
+Ensemble.cpp:159: error: syntax error before `.' token
+Ensemble.cpp:160: error: syntax error before `.' token
+Ensemble.cpp:163: error: syntax error before `.' token
+Ensemble.cpp:164: error: syntax error before `.' token
+Ensemble.cpp:165: error: syntax error before `.' token
+Ensemble.cpp:167: error: syntax error before `.' token
+Ensemble.cpp:168: error: syntax error before `.' token
+Ensemble.cpp:169: error: syntax error before `.' token
+Ensemble.cpp:171: error: syntax error before `.' token
+Ensemble.cpp:172: error: syntax error before `.' token
+Ensemble.cpp:173: error: syntax error before `.' token
+Ensemble.cpp:175: error: syntax error before `.' token
+Ensemble.cpp:176: error: syntax error before `.' token
+Ensemble.cpp:177: error: syntax error before `.' token
+Ensemble.cpp:180: error: syntax error before `.' token
+Ensemble.cpp:181: error: syntax error before `.' token
+Ensemble.cpp:182: error: syntax error before `.' token
+Ensemble.cpp:183: error: syntax error before `.' token
+Ensemble.cpp:186: error: syntax error before `.' token
+Ensemble.cpp:189: error: syntax error before `.' token
+Ensemble.cpp:190: error: syntax error before `.' token
+Ensemble.cpp:191: error: syntax error before `.' token
+Ensemble.cpp:194: error: syntax error before `.' token
+Ensemble.cpp:195: error: syntax error before `.' token
+Ensemble.cpp:196: error: ISO C++ forbids declaration of `RUP_LOW' with no type
+Ensemble.cpp:197: error: ISO C++ forbids declaration of `RUP_LOW2' with no type
+Ensemble.cpp:197: error: conflicting types for `int RUP_LOW2'
+Ensemble.cpp:150: error: previous declaration as `double RUP_LOW2'
+Ensemble.cpp:198: error: ISO C++ forbids declaration of `RUP_LOW3' with no type
+Ensemble.cpp:198: error: conflicting types for `int RUP_LOW3'
+Ensemble.cpp:151: error: previous declaration as `double RUP_LOW3'
+Ensemble.cpp:199: error: ISO C++ forbids declaration of `RUP_LOW4' with no type
+Ensemble.cpp:199: error: conflicting types for `int RUP_LOW4'
+Ensemble.cpp:152: error: previous declaration as `double RUP_LOW4'
+Ensemble.cpp:200: error: ISO C++ forbids declaration of `RUP_LOW5' with no type
+Ensemble.cpp:200: error: conflicting types for `int RUP_LOW5'
+Ensemble.cpp:153: error: previous declaration as `double RUP_LOW5'
+Ensemble.cpp:202: error: syntax error before `.' token
+Ensemble.cpp:203: error: syntax error before `.' token
+Ensemble.cpp:204: error: syntax error before `.' token
+Ensemble.cpp:208: error: syntax error before `<<' token
+Ensemble.cpp:209: error: syntax error before `.' token
+Ensemble.cpp:210: error: syntax error before `.' token
+Ensemble.cpp:211: error: syntax error before `.' token
+Ensemble.cpp:212: error: syntax error before `.' token
+Ensemble.cpp:214: error: syntax error before `<<' token
+Ensemble.cpp:215: error: syntax error before `<<' token
+Ensemble.cpp:216: error: syntax error before `<<' token
+Ensemble.cpp:222: error: syntax error before `.' token
+Ensemble.cpp:223: error: syntax error before `.' token
+Ensemble.cpp:224: error: syntax error before `.' token
+Ensemble.cpp:228: error: ISO C++ forbids declaration of `RSPC2' with no type
+Ensemble.cpp:228: error: conflicting types for `int RSPC2'
+Ensemble.cpp:227: error: previous declaration as `double RSPC2'
+Ensemble.cpp:229: error: ISO C++ forbids declaration of `RSPC6' with no type
+Ensemble.cpp:229: error: conflicting types for `int RSPC6'
+Ensemble.cpp:227: error: previous declaration as `double RSPC6'
+Ensemble.cpp:230: error: ISO C++ forbids declaration of `RSPC12' with no type
+Ensemble.cpp:230: error: conflicting types for `int RSPC12'
+Ensemble.cpp:227: error: previous declaration as `double RSPC12'
+Ensemble.cpp:232: error: syntax error before `.' token
+Ensemble.cpp:233: error: syntax error before `.' token
+Ensemble.cpp:237: error: syntax error before `.' token
+Ensemble.cpp:238: error: syntax error before `.' token
+Ensemble.cpp:239: error: syntax error before `.' token
+Ensemble.cpp:240: error: syntax error before `.' token
+Ensemble.cpp:245: error: syntax error before `.' token
+Ensemble.cpp:247: error: syntax error before `.' token
+Ensemble.cpp:249: error: syntax error before `.' token
+Ensemble.cpp:252: error: syntax error before `.' token
+Ensemble.cpp:253: error: syntax error before `.' token
+Ensemble.cpp:254: error: syntax error before `.' token
+Ensemble.cpp:256: error: syntax error before `.' token
+Ensemble.cpp:257: error: syntax error before `.' token
+Ensemble.cpp:258: error: syntax error before `.' token
+Ensemble.cpp:259: error: syntax error before `.' token
+Ensemble.cpp:260: error: syntax error before `.' token
+Ensemble.cpp:261: error: syntax error before `.' token
+Ensemble.cpp:262: error: syntax error before `.' token
+Ensemble.cpp:263: error: syntax error before `.' token
+Ensemble.cpp:264: error: syntax error before `.' token
+Ensemble.cpp:265: error: syntax error before `.' token
+Ensemble.cpp:266: error: syntax error before `.' token
+Ensemble.cpp:267: error: syntax error before `.' token
+Ensemble.cpp:268: error: syntax error before `.' token
+Ensemble.cpp:269: error: syntax error before `.' token
+Ensemble.cpp:271: error: syntax error before `.' token
+Ensemble.cpp:280: error: `Parameters' was not declared in this scope
+Ensemble.cpp:280: error: parse error before `,' token
+Ensemble.cpp: In member function `void Ensemble::RigidMol(...)':
+Ensemble.cpp:317: error: `mols' undeclared (first use this function)
+Ensemble.cpp: At global scope:
+Ensemble.cpp:413: error: parse error before `,' token
+Ensemble.cpp:441: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:441: error: parse error before `,' token
+Ensemble.cpp: In member function `void Ensemble::printCoords(...)':
+Ensemble.cpp:444: error: variable `std::ofstream outFile' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:456: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:456: error: parse error before `,' token
+Ensemble.cpp: In member function `void Ensemble::printAllCoords(...)':
+Ensemble.cpp:459: error: variable `std::ofstream outFile' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:472: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:472: error: parse error before `,' token
+Ensemble.cpp: In member function `void Ensemble::printAllMyCoords(...)':
+Ensemble.cpp:475: error: variable `std::ofstream outFile' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:488: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:488: error: parse error before `)' token
+Ensemble.cpp: In member function `void Ensemble::writeForce(...)':
+Ensemble.cpp:491: error: variable `std::ofstream outFile' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:503: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:503: error: parse error before `)' token
+Ensemble.cpp: In member function `void Ensemble::writeAllForce(...)':
+Ensemble.cpp:506: error: variable `std::ofstream outFile' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:519: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:519: error: parse error before `)' token
+Ensemble.cpp: In member function `void Ensemble::printVel(...)':
+Ensemble.cpp:522: error: variable `std::ofstream outFile' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:535: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:535: error: parse error before `,' token
+Ensemble.cpp: In member function `void Ensemble::NVEintegrateMotionC(...)':
+Ensemble.cpp:565: error: `NVE' undeclared (first use this function)
+Ensemble.cpp:565: error: `local_mols' undeclared (first use this function)
+Ensemble.cpp: At global scope:
+Ensemble.cpp:604: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:604: error: parse error before `,' token
+Ensemble.cpp: In member function `void Ensemble::calcEForce(...)':
+Ensemble.cpp:644: error: `NNN' undeclared (first use this function)
+Ensemble.cpp: At global scope:
+Ensemble.cpp:729: error: parse error before `,' token
+Ensemble.cpp:1016: error: parse error before `,' token
+Ensemble.cpp:1323: error: parse error before `,' token
+Ensemble.cpp:1401: error: parse error before `,' token
+Ensemble.cpp:1476: error: parse error before `)' token
+Ensemble.cpp:1500: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:1500: error: parse error before `,' token
+Ensemble.cpp:1542: error: parse error before `,' token
+Ensemble.cpp:1568: error: parse error before `)' token
+Ensemble.cpp:1604: error: parse error before `,' token
+Ensemble.cpp:1874: error: parse error before `,' token
+Ensemble.cpp:1981: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:1981: error: parse error before `,' token
+Ensemble.cpp: In member function `void Ensemble::checkIdeal(...)':
+Ensemble.cpp:1993: error: variable `std::ofstream outfile' has initializer but 
+   incomplete type
+Ensemble.cpp: At global scope:
+Ensemble.cpp:2051: error: parse error before `,' token
+Ensemble.cpp:2161: error: parse error before `,' token
+Ensemble.cpp:2306: error: type specifier omitted for parameter `Constants'
+Ensemble.cpp:2306: error: parse error before `,' token
+make: *** [Ensemble.o] Error 1

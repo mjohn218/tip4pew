@@ -1,0 +1,106 @@
+mpicxx -O3 -Wall -o Tip4p Tip4p.cpp Ensemble.o   -lm
+In file included from /usr/include/c++/3.3/backward/fstream.h:31,
+                 from Parameters.h:13,
+                 from Ensemble.h:6,
+                 from Tip4p.cpp:21:
+/usr/include/c++/3.3/backward/backward_warning.h:32:2: warning: #warning This file includes at least one deprecated or antiquated header. Please consider using one of the 32 headers found in section 17.4.1.2 of the C++ standard. Examples include substituting the <X> header for the <X.h> header for C++ includes, or <sstream> instead of the deprecated header <strstream.h>. To disable this warning use -Wno-deprecated.
+Tip4p.cpp: In function `int main(int, char**)':
+Tip4p.cpp:64: error: `Watersend' undeclared (first use this function)
+Tip4p.cpp:64: error: (Each undeclared identifier is reported only once for each 
+   function it appears in.)
+Tip4p.cpp:64: error: parse error before `[' token
+Tip4p.cpp:71: error: parse error before `types'
+Tip4p.cpp:55: warning: unused variable `double mend'
+Tip4p.cpp:59: warning: unused variable `int me'
+Tip4p.cpp:60: warning: unused variable `int nprocs'
+Tip4p.cpp:61: warning: unused variable `int i'
+Tip4p.cpp:61: warning: unused variable `int err'
+Tip4p.cpp:67: warning: unused variable `MPI_Datatype Watertype'
+Tip4p.cpp:68: warning: unused variable `MPI_Aint disp[4]'
+Tip4p.cpp:69: warning: unused variable `int base'
+Tip4p.cpp:70: warning: unused variable `int blocklen[4]'
+Tip4p.cpp: At global scope:
+Tip4p.cpp:74: error: `mols' was not declared in this scope
+Tip4p.cpp:74: error: `disp' was not declared in this scope
+Tip4p.cpp:74: error: ISO C++ forbids declaration of `MPI_Address' with no type
+Tip4p.cpp:74: error: `int MPI_Address' redeclared as different kind of symbol
+/usr/mill/pkg/mpich-1.2.6/include/mpi.h:359: error: previous declaration of `
+   int MPI_Address(void*, MPI_Aint*)'
+Tip4p.cpp:74: error: initializer list being treated as compound expression
+Tip4p.cpp:75: error: `mols' was not declared in this scope
+Tip4p.cpp:75: error: `disp' was not declared in this scope
+Tip4p.cpp:75: error: ISO C++ forbids declaration of `MPI_Address' with no type
+Tip4p.cpp:75: error: redefinition of `int MPI_Address'
+Tip4p.cpp:74: error: `int MPI_Address' previously defined here
+Tip4p.cpp:75: error: initializer list being treated as compound expression
+Tip4p.cpp:76: error: `mols' was not declared in this scope
+Tip4p.cpp:76: error: `disp' was not declared in this scope
+Tip4p.cpp:76: error: ISO C++ forbids declaration of `MPI_Address' with no type
+Tip4p.cpp:76: error: redefinition of `int MPI_Address'
+Tip4p.cpp:75: error: `int MPI_Address' previously defined here
+Tip4p.cpp:76: error: initializer list being treated as compound expression
+Tip4p.cpp:77: error: `mols' was not declared in this scope
+Tip4p.cpp:77: error: `disp' was not declared in this scope
+Tip4p.cpp:77: error: ISO C++ forbids declaration of `MPI_Address' with no type
+Tip4p.cpp:77: error: redefinition of `int MPI_Address'
+Tip4p.cpp:76: error: `int MPI_Address' previously defined here
+Tip4p.cpp:77: error: initializer list being treated as compound expression
+Tip4p.cpp:78: error: parse error before `for'
+Tip4p.cpp:78: error: syntax error before `>=' token
+Tip4p.cpp:80: error: ISO C++ forbids declaration of `err' with no type
+Tip4p.cpp:80: error: `blocklen' was not declared in this scope
+Tip4p.cpp:80: error: `disp' was not declared in this scope
+Tip4p.cpp:80: error: `types' was not declared in this scope
+Tip4p.cpp:80: error: `Watertype' was not declared in this scope
+Tip4p.cpp:81: error: `Watertype' was not declared in this scope
+Tip4p.cpp:81: error: ISO C++ forbids declaration of `MPI_Type_commit' with no 
+   type
+Tip4p.cpp:81: error: `int MPI_Type_commit' redeclared as different kind of 
+   symbol
+/usr/mill/pkg/mpich-1.2.6/include/mpi.h:368: error: previous declaration of `
+   int MPI_Type_commit(MPI_Datatype*)'
+Tip4p.cpp:89: error: ISO C++ forbids declaration of `srand' with no type
+Tip4p.cpp:89: error: `int srand' redeclared as different kind of symbol
+/usr/include/stdlib.h:475: error: previous declaration of `void srand(unsigned 
+   int)'
+Tip4p.cpp:104: error: syntax error before `.' token
+Tip4p.cpp:108: error: `argv' was not declared in this scope
+Tip4p.cpp:109: error: `argv' was not declared in this scope
+Tip4p.cpp:110: error: parse error before `if'
+Tip4p.cpp:114: error: syntax error before `.' token
+Tip4p.cpp:115: error: syntax error before `.' token
+Tip4p.cpp:117: error: syntax error before `<<' token
+Tip4p.cpp:129: error: syntax error before `.' token
+Tip4p.cpp:131: error: syntax error before `.' token
+Tip4p.cpp:141: error: syntax error before `.' token
+Tip4p.cpp:150: error: syntax error before `.' token
+Tip4p.cpp:158: error: syntax error before `.' token
+Tip4p.cpp:160: error: syntax error before `.' token
+Tip4p.cpp:170: error: syntax error before `.' token
+Tip4p.cpp:172: error: syntax error before `.' token
+Tip4p.cpp:176: error: syntax error before `.' token
+Tip4p.cpp:177: error: syntax error before `<<' token
+Tip4p.cpp:185: error: syntax error before `<<' token
+Tip4p.cpp:186: error: parse error before `;' token
+Tip4p.cpp:186: error: syntax error before `++' token
+Tip4p.cpp:198: error: ISO C++ forbids declaration of `Akin' with no type
+Tip4p.cpp:198: error: conflicting types for `int Akin'
+Tip4p.cpp:180: error: previous declaration as `double Akin'
+Tip4p.cpp:199: error: ISO C++ forbids declaration of `InstTemp' with no type
+Tip4p.cpp:199: error: conflicting types for `int InstTemp'
+Tip4p.cpp:180: error: previous declaration as `double InstTemp'
+Tip4p.cpp:201: error: parse error before `if'
+Tip4p.cpp:206: error: syntax error before `.' token
+Tip4p.cpp:216: error: ISO C++ forbids declaration of `mend' with no type
+Tip4p.cpp:217: error: syntax error before `<<' token
+Tip4p.cpp:219: error: ISO C++ forbids declaration of `Finalize' with no type
+Tip4p.cpp:219: error: `int MPI::Finalize()' should have been declared inside `
+   MPI'
+Tip4p.cpp:219: error: new declaration `int MPI::Finalize()'
+/usr/mill/pkg/mpich-1.2.6/include/mpi2c++/functions.h:76: error: ambiguates old 
+   declaration `void MPI::Finalize()'
+Tip4p.cpp:222: error: parse error before `}' token
+Tip4p.cpp: In function `void __static_initialization_and_destruction_0(int, 
+   int)':
+Tip4p.cpp:199: warning: statement with no effect
+make: *** [Tip4p] Error 1

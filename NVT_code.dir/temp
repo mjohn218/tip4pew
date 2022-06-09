@@ -1,0 +1,62 @@
+mpic++ -O3 -Wall  -o spce spce.cpp mpi_spc.o   -lm
+spce.cpp: In function `int main(int, char**)':
+spce.cpp:142: error: cannot convert `DiffSend*' to `WaterSend*' for argument `2
+   ' to `void readCoords(char*, WaterSend*)'
+spce.cpp:155: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void RigidMol(Parameters&, Constants, WaterSend*, DiffSend*, Center*)'
+spce.cpp:160: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void printCoords(char*, Constants, WaterSend*, int)'
+spce.cpp:229: error: cannot convert `DiffSend*' to `WaterSend*' for argument `4
+   ' to `void mcalcEForce(Ensemble&, Constants, Parameters, WaterSend*, 
+   WaterSend*, double*, double*, double*, double*, Kindex*, WaterSend*, 
+   Center*, Table*, double*, kspace*, kspace*, kspace*, kspace*, kspace*, 
+   kspace*, kspace*, kspace*)'
+spce.cpp:252: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void VelocityNormal(Constants, Parameters, WaterSend*, DiffSend*, 
+   double*, double*)'
+spce.cpp:284: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void VelocityNormal(Constants, Parameters, WaterSend*, DiffSend*, 
+   double*, double*)'
+spce.cpp:312: error: cannot convert `DiffSend*' to `WaterSend*' for argument `4
+   ' to `void checkIdeal(char*, Constants, Parameters, WaterSend*)'
+spce.cpp:354: error: cannot convert `DiffSend*' to `WaterSend*' for argument `4
+   ' to `void NVTintegrateMotion(Ensemble&, Constants, Parameters, WaterSend*, 
+   WaterSend*, MPI::Datatype, int, double*, double*, double*, double*, Kindex*, 
+   DiffSend*, DiffSend*, WaterSend*, Center*, Table*, double*, kspace*, 
+   kspace*, kspace*, kspace*, kspace*, kspace*, kspace*, kspace*, double*, 
+   double*, Thermostat&)'
+spce.cpp:379: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void printCoords(char*, Constants, WaterSend*, int)'
+spce.cpp:402: error: cannot convert `DiffSend*' to `WaterSend*' for argument `4
+   ' to `void NVTintegrateMotion(Ensemble&, Constants, Parameters, WaterSend*, 
+   WaterSend*, MPI::Datatype, int, double*, double*, double*, double*, Kindex*, 
+   DiffSend*, DiffSend*, WaterSend*, Center*, Table*, double*, kspace*, 
+   kspace*, kspace*, kspace*, kspace*, kspace*, kspace*, kspace*, double*, 
+   double*, Thermostat&)'
+spce.cpp: In function `void NVTintegrateMotion(Ensemble&, Constants, 
+   Parameters, DiffSend*, DiffSend*, MPI::Datatype, int, double*, double*, 
+   double*, double*, Kindex*, DiffSend*, DiffSend*, DiffSend*, Center*, Table*, 
+   double*, kspace*, kspace*, kspace*, kspace*, kspace*, kspace*, kspace*, 
+   kspace*, double*, double*, Thermostat&)':
+spce.cpp:569: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void RattlePos(Constants, Parameters, WaterSend*, DiffSend*, 
+   DiffSend*, double*, double*)'
+spce.cpp:580: error: cannot convert `DiffSend*' to `WaterSend*' for argument `4
+   ' to `void mcalcEForce(Ensemble&, Constants, Parameters, WaterSend*, 
+   WaterSend*, double*, double*, double*, double*, Kindex*, WaterSend*, 
+   Center*, Table*, double*, kspace*, kspace*, kspace*, kspace*, kspace*, 
+   kspace*, kspace*, kspace*)'
+spce.cpp:603: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void RattleVel(Constants, Parameters, WaterSend*, DiffSend*, double*, 
+   double*)'
+spce.cpp: In function `void mcalcEForce(Ensemble&, Constants, Parameters, 
+   DiffSend*, DiffSend*, double*, double*, double*, double*, Kindex*, 
+   DiffSend*, Center*, Table*, double*, kspace*, kspace*, kspace*, kspace*, 
+   kspace*, kspace*, kspace*, kspace*)':
+spce.cpp:652: error: cannot convert `DiffSend*' to `WaterSend*' for argument `2
+   ' to `void CenterMassWater(Constants, WaterSend*, Center*)'
+spce.cpp:656: error: cannot convert `DiffSend*' to `WaterSend*' for argument `3
+   ' to `void RWALD(Constants, Parameters, WaterSend*, WaterSend*, WaterSend*, 
+   Center*, Ensemble&, Table*)'
+mpic++: No such file or directory
+make: *** [spce] Error 1

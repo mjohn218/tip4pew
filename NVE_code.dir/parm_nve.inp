@@ -1,0 +1,23 @@
+10     #Tsteps
+0	#T Equilibrate
+0  #T vel rescale
+.001    #dt
+240.0	#Temperature
+512	#Number molecul
+1.123    #Density g/cm^3
+3	#Atoms per molecule
+0	#Equil flag 1=yes
+1E-10	#tolerance
+3	#nconst
+9.0	#R_LOWER
+9.5	#R_UPPER
+3.16435	#RSPC
+0.162750	#ESPC
+0.52422	#Q2
+0.52422	#Q3
+-1.04844	#Q4	
+1.0	#oldboxl 1=noscle
+50   #fs isave
+500 #fs statwrite
+200000 #fs allsave
+100 #num saves perfile

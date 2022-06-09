@@ -1,0 +1,32 @@
+Helpful Lectures:
+cs267_mpi_saphir_2005.pdf
+Was a lecture given in our class and seemed to be a very useful primer for 
+writing in MPI
+
+part1.pdf
+An extra tutorial we found on the web with some useful slides, i would
+look at this secondly, with more useful syntax and examples further along
+in it
+It shows pictures of different communication calls like ALLtoALL
+
+
+part2.pdf
+This part is not really necessary, but just in case you want to reference it
+it has more advanced topics in it
+
+And then www.mpi-forum.org has some lengthy documentation about all the
+different MPI commands
+
+Just some other things: All the talk about getting in deadlocks we don't 
+have to worry about when using Collective communications, which is good.
+We'll use MPI_allgather, instead of MPI_send and MPI_RECV because all 
+the processors need the data and ALLgather combines send and recv into 1.
+
+Also the difference between AllGather and AllGatherv is that in the second
+case each processor can have a different number of molecules. 
+I simplified my code to just use the first version so that the number 
+of molecules has to be evenly divisible by the number of processors. 
+
+For running on vita, so far the programs will compile, but the LAM/MPI
+envirnment isn't setup yet, so you can't mpirun them, so i'll let you know
+when that is set up
